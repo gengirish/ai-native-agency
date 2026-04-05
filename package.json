@@ -8,12 +8,18 @@
     "dev": "node --watch src/server.js",
     "db:migrate": "node db/migrate.js",
     "db:reset": "node db/reset.js",
-    "test": "jest --forceExit --detectOpenHandles"
+    "test": "jest --forceExit --detectOpenHandles",
+    "test:e2e": "npx playwright test",
+    "test:e2e:headed": "npx playwright test --headed"
   },
   "jest": {
     "testEnvironment": "node",
-    "setupFiles": ["./tests/setup.js"],
-    "testMatch": ["**/tests/**/*.test.js"]
+    "setupFiles": [
+      "./tests/setup.js"
+    ],
+    "testMatch": [
+      "**/tests/**/*.test.js"
+    ]
   },
   "dependencies": {
     "cors": "^2.8.6",
@@ -25,6 +31,7 @@
     "pg": "^8.13.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "jest": "^30.3.0",
     "supertest": "^7.2.2"
   }
