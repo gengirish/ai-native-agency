@@ -1,0 +1,75 @@
+---
+description: AI-Native Agency Platform conventions and patterns
+globs: ["src/**/*.js", "db/**/*.js"]
+alwaysApply: true
+---
+
+# AI-Native Agency Platform
+
+## Stack
+
+- **Runtime:** Node.js
+- **HTTP:** Express
+- **Database:** PostgreSQL (Neon)
+- **Modules:** CommonJS only (`require` / `module.exports`). No ES modules. No TypeScript.
+
+## Data access
+
+- No ORM. Use raw SQL through `db/connection.js` and its `query` function.
+- **SQL:** Parameterized placeholders only (`$1`, `$2`, …). Never build queries with string concatenation of user input.
+- **Schema:** Tables and columns use `snake_case`.
+- **IDs:** UUIDs everywhere; generate with `gen_random_uuid()` in Postgres (or equivalent in migrations).
+- **Money:** Store amounts as **integers in cents**. Never use floating point for money.
+- **Time:** Columns as `TIMESTAMPTZ`; serialize to clients as ISO 8601 strings.
+
+## Multi-tenancy
+
+- Every tenant-scoped route must scope data by `req.tenantId` (set after auth + tenant middleware).
+- Service-layer queries that touch tenant data must include `tenant_id` in `WHERE` clauses appropriately.
+
+## HTTP and responses
+
+- **Errors:** `{ error: { message, code } }` (aligned with `errorHandler` and custom errors).
+- **Successful reads:** `{ data: ... }`.
+- **Successful mutations:** `{ success: true, data: ... }` where applicable.
+- **Pagination:** Accept `page` and `limit`; return `{ data, total, page, limit }`.
+
+## Routes
+
+- Wrap async handlers in `try/catch` and call `next(err)` on failure.
+- Prefer the patterns in `.cursor/rules/api-routes.mdc`.
+
+## Custom errors (`src/utils/errors.js`)
+
+- `ValidationError` → 400
+- `ForbiddenError` → 403
+- `NotFoundError` → 404
+- `ConflictError` → 409
+
+## Auth and roles
+
+- **Header:** `Authorization: Bearer <token>` (decoded by auth middleware).
+- **`req.user`:** `{ id, tenantId, role }`.
+- **Roles:** `admin`, `expert`, `client`.
+
+## AI usage
+
+- Log every AI API call cost to the `ai_cost_log` table (via `aiGateway.logCost()` or the established helper).
+
+## Code style
+
+- **JavaScript:** `camelCase` for variables and functions.
+- **Files:** `camelCase.js` for services, utils, and route modules.
+
+## Secrets
+
+- Never commit `.env`. Document variables in `.env.example` only.
+
+## Feature order
+
+When adding a feature, follow this order:
+
+1. Database migration (`db/migrations/`)
+2. Service method (`src/services/`)
+3. Route (`src/routes/`)
+4. Tests

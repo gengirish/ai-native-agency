@@ -1,0 +1,30 @@
+---
+description: Service layer patterns
+globs: ["src/services/**/*.js"]
+alwaysApply: false
+---
+
+# Services
+
+## Responsibility
+
+- Services are the **only** layer that executes database queries (via `db/connection.js`).
+- Service methods contain **business logic only**: no `req`, `res`, or `next` parameters.
+
+## SQL
+
+- Use **parameterized** queries (`$1`, `$2`, …) exclusively. Never concatenate untrusted values into SQL strings.
+- For tenant-owned data, **always** constrain rows with `tenant_id` (and any other access rules) in `WHERE` clauses.
+
+## Return values and errors
+
+- Return **plain JavaScript objects** (or arrays of them), not raw `pg` row objects unless the project explicitly maps at the boundary.
+- On failure, **throw** custom errors (`ValidationError`, `NotFoundError`, `ForbiddenError`, `ConflictError`, etc.) from `src/utils/errors.js`. Do not return `{ error: ... }` objects from services.
+
+## AI calls
+
+- For every call to external AI APIs, record cost through **`aiGateway.logCost()`** (or the current equivalent) so usage lands in **`ai_cost_log`**.
+
+## Testing
+
+- Keep services easy to unit test: deterministic inputs, injected dependencies where needed, no Express types.

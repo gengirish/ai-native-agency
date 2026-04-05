@@ -1,0 +1,60 @@
+---
+description: API route patterns and conventions
+globs: ["src/routes/**/*.js"]
+alwaysApply: false
+---
+
+# API routes
+
+## Router template
+
+Protected routes should authenticate and enforce tenant isolation before handlers:
+
+```javascript
+const express = require('express');
+const router = express.Router();
+const { authenticate } = require('../middleware/auth');
+const { tenantIsolation } = require('../middleware/tenantIsolation');
+
+router.use(authenticate);
+router.use(tenantIsolation);
+
+router.get('/', async (req, res, next) => {
+  try {
+    const result = await service.method(req.tenantId, req.query);
+    res.json({ data: result });
+  } catch (err) {
+    next(err);
+  }
+});
+```
+
+Adjust `authenticate` / `tenantIsolation` only where a route is intentionally public (document why).
+
+## Validation
+
+- Validate request bodies (and relevant query params) **before** calling services. Use a shared `validateBody` helper once it exists; keep validation consistent across POST/PUT/PATCH routes.
+
+## Route ordering
+
+- Register **static path segments before parameterized routes** (e.g. `GET /stats` before `GET /:id`, `GET /defaults` before `GET /:id`).
+
+## Methods and status codes
+
+- **POST / PUT:** Validate input; return **201** for successful creation when a new resource is created, **200** for other successful mutations.
+- **DELETE:** **204** with no body when deletion succeeds, unless the API contract requires a JSON body.
+- **GET:** **200** with `{ data: ... }` (or paginated shape) on success.
+
+## Pagination
+
+- List endpoints should support `page` and `limit`.
+- Defaults: `page = 1`, `limit = 20`, **maximum** `limit = 100`.
+- Response: `{ data, total, page, limit }`.
+
+## Public endpoints
+
+- Apply stricter **rate limiting** to public or unauthenticated endpoints.
+
+## Tenancy
+
+- Pass `req.tenantId` into service calls for all tenant-scoped resources; never trust client-supplied tenant IDs over the authenticated context.
