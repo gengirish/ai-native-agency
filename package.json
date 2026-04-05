@@ -1,46 +1,29 @@
 {
-  "name": "ai-native-agency",
+  "name": "ai-agency-platform",
   "version": "0.1.0",
-  "description": "AI-Native Agency Platform",
   "private": true,
   "scripts": {
-    "start": "node src/server.js",
-    "dev": "node --watch src/server.js",
-    "db:migrate": "node db/migrate.js",
-    "db:reset": "node db/reset.js",
-    "test": "jest --forceExit --detectOpenHandles",
-    "test:e2e": "npx playwright test",
-    "test:e2e:headed": "npx playwright test --headed"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "setupFiles": [
-      "./tests/setup.js"
-    ],
-    "testMatch": [
-      "**/tests/**/*.test.js"
-    ]
+    "dev": "next dev --turbopack",
+    "build": "next build",
+    "start": "next start",
+    "lint": "next lint"
   },
   "dependencies": {
-    "cors": "^2.8.6",
-    "dotenv": "^16.4.7",
-    "express": "^5.2.1",
-    "helmet": "^8.1.0",
-    "joi": "^18.1.2",
-    "morgan": "^1.10.1",
-    "pg": "^8.13.3",
-    "recharts": "^3.8.1"
+    "clsx": "^2.1.1",
+    "lucide-react": "^0.400.0",
+    "next": "^15.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "recharts": "^2.15.0",
+    "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
-    "@playwright/test": "^1.59.1",
-    "@types/node": "^25.5.2",
-    "@types/react": "^19.2.14",
-    "@types/react-dom": "^19.2.3",
-    "autoprefixer": "^10.4.27",
-    "jest": "^30.3.0",
-    "postcss": "^8.5.8",
-    "supertest": "^7.2.2",
-    "tailwindcss": "^4.2.2",
-    "typescript": "^6.0.2"
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49",
+    "tailwindcss": "^3.4.17",
+    "typescript": "^5.7.0"
   }
 }

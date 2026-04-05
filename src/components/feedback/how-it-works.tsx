@@ -1,8 +1,8 @@
-import { CheckCircle2, MessageCircleQuote, Wand2 } from "lucide-react"
+import { CheckCircle2, MessageCircle, Wand2 } from "lucide-react"
 
 const steps = [
   {
-    icon: MessageCircleQuote,
+    icon: MessageCircle,
     title: "Client says…",
     body: "Paste the vague note—\u201cmake it pop,\u201d \u201cmore premium,\u201d whatever landed in your inbox.",
   },
