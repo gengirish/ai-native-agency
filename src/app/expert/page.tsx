@@ -1,12 +1,14 @@
 "use client"
 
+import { useState, useEffect, useCallback, useMemo } from "react"
+import { RequireRole } from "@/components/auth/require-role"
 import { ExpertPerformanceSummary } from "@/components/expert/expert-performance-summary"
 import { ExpertQueueManagement } from "@/components/expert/expert-queue-management"
 import { ExpertRefinementPanel } from "@/components/expert/expert-refinement-panel"
 import { ExpertStatsRow } from "@/components/expert/expert-stats-row"
-import { mockExpertAssignments } from "@/lib/mock-data"
+import { EmptyState } from "@/components/ui/empty-state"
+import { getExpertAssignments } from "@/lib/api"
 import type { ExpertAssignment } from "@/types"
-import { useCallback, useMemo, useState } from "react"
 
 function bumpQuality(before: number): number {
   const delta = 0.2 + Math.random() * 0.25
@@ -14,25 +16,24 @@ function bumpQuality(before: number): number {
 }
 
 export default function ExpertPage() {
-  const [assignments, setAssignments] = useState<ExpertAssignment[]>(() => [
-    ...mockExpertAssignments,
-    {
-      id: "ea-esc-1",
-      projectId: "p8",
-      projectTitle: "TechFlow Marketing Collateral",
-      projectType: "marketing_collateral",
-      expertId: "u2",
-      expertName: "Jordan Chen",
-      status: "escalated",
-      escalationLevel: "senior",
-      priority: "medium",
-      claimedAt: "2026-04-04T16:00:00Z",
-      reviewTimeMinutes: 0,
-      qualityBefore: 3.8,
-      qualityAfter: 0,
-    },
-  ])
+  const [assignments, setAssignments] = useState<ExpertAssignment[]>([])
+  const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    getExpertAssignments()
+      .then((data) => {
+        if (!cancelled) setAssignments(data)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   const selected = useMemo(
     () => assignments.find((a) => a.id === selectedId) ?? null,
@@ -87,35 +88,50 @@ export default function ExpertPage() {
   }, [])
 
   return (
-    <div className="flex flex-col gap-6 p-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
-          Expert Queue
-        </h1>
-        <p className="mt-1 text-slate-600">
-          Claim, review, and refine AI-generated deliverables
-        </p>
-      </header>
+    <RequireRole permission="expert:view">
+      <div className="flex flex-col gap-6 p-8">
+        <header>
+          <h1 className="text-2xl font-semibold tracking-tight text-slate-900">
+            Expert Queue
+          </h1>
+          <p className="mt-1 text-slate-600">
+            Claim, review, and refine AI-generated deliverables
+          </p>
+        </header>
 
-      <ExpertStatsRow assignments={assignments} />
-
-      <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
-        <div className="space-y-6 xl:col-span-3">
-          <ExpertQueueManagement
-            assignments={assignments}
-            selectedId={selectedId}
-            onSelect={setSelectedId}
-            onClaim={claim}
-            onCompleteReview={completeReview}
-            onEscalateToSenior={escalateToSenior}
+        {loading ? (
+          <div className="flex items-center justify-center py-24">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+          </div>
+        ) : assignments.length === 0 ? (
+          <EmptyState
+            title="No assignments"
+            description="New review assignments will appear here."
           />
-        </div>
-        <div className="xl:col-span-2">
-          <ExpertRefinementPanel assignment={selected} />
-        </div>
-      </div>
+        ) : (
+          <>
+            <ExpertStatsRow assignments={assignments} />
 
-      <ExpertPerformanceSummary assignments={assignments} />
-    </div>
+            <div className="grid grid-cols-1 gap-6 xl:grid-cols-5">
+              <div className="space-y-6 xl:col-span-3">
+                <ExpertQueueManagement
+                  assignments={assignments}
+                  selectedId={selectedId}
+                  onSelect={setSelectedId}
+                  onClaim={claim}
+                  onCompleteReview={completeReview}
+                  onEscalateToSenior={escalateToSenior}
+                />
+              </div>
+              <div className="xl:col-span-2">
+                <ExpertRefinementPanel assignment={selected} />
+              </div>
+            </div>
+
+            <ExpertPerformanceSummary assignments={assignments} />
+          </>
+        )}
+      </div>
+    </RequireRole>
   )
 }

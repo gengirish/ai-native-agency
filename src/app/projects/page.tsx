@@ -1,6 +1,9 @@
 "use client"
 
-import { mockProjects } from "@/lib/mock-data"
+import { RequireRole } from "@/components/auth/require-role"
+import { formatProjectTypeLabel } from "@/components/brief/project-type-config"
+import { EmptyState } from "@/components/ui/empty-state"
+import { getProjects } from "@/lib/api"
 import {
   cn,
   formatDate,
@@ -8,18 +11,18 @@ import {
   getStatusColor,
 } from "@/lib/utils"
 import type { Project, ProjectStatus } from "@/types"
-import { formatProjectTypeLabel } from "@/components/brief/project-type-config"
 import {
   Calendar,
   ClipboardList,
   FileText,
   Flag,
+  FolderOpen,
   Plus,
   Search,
   Star,
 } from "lucide-react"
 import Link from "next/link"
-import { useMemo, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 
 type StatusTab = "all" | "active" | "completed" | "draft"
 
@@ -112,12 +115,17 @@ function ProjectCard({ project }: { project: Project }) {
 }
 
 export default function ProjectsPage() {
+  const [projects, setProjects] = useState<Project[]>([])
   const [tab, setTab] = useState<StatusTab>("all")
   const [query, setQuery] = useState("")
 
+  useEffect(() => {
+    void getProjects().then(setProjects)
+  }, [])
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
-    return mockProjects.filter((p) => {
+    return projects.filter((p) => {
       if (!matchesTab(p, tab)) return false
       if (!q) return true
       return (
@@ -126,7 +134,7 @@ export default function ProjectsPage() {
         formatProjectTypeLabel(p.type).toLowerCase().includes(q)
       )
     })
-  }, [tab, query])
+  }, [tab, query, projects])
 
   const tabs: { id: StatusTab; label: string }[] = [
     { id: "all", label: "All" },
@@ -136,69 +144,80 @@ export default function ProjectsPage() {
   ]
 
   return (
-    <div className="p-8">
-      <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
-            <FileText className="h-5 w-5" />
+    <RequireRole permission="projects:view">
+      <div className="p-8">
+        <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
+              <FileText className="h-5 w-5" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-slate-900">Projects</h1>
+              <p className="text-sm text-slate-600">Track briefs, delivery, and quality in one place.</p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight text-slate-900">Projects</h1>
-            <p className="text-sm text-slate-600">Track briefs, delivery, and quality in one place.</p>
-          </div>
-        </div>
-        <Link
-          href="/projects/new"
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-        >
-          <Plus className="h-4 w-4" />
-          New Brief
-        </Link>
-      </header>
+          <Link
+            href="/projects/new"
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+          >
+            <Plus className="h-4 w-4" />
+            New Brief
+          </Link>
+        </header>
 
-      <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
-          {tabs.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={cn(
-                "rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2",
-                tab === t.id
-                  ? "bg-indigo-600 text-white shadow-sm"
-                  : "text-slate-600 hover:bg-slate-50"
-              )}
-            >
-              {t.label}
-            </button>
-          ))}
+        <div className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-1 shadow-sm">
+            {tabs.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setTab(t.id)}
+                className={cn(
+                  "rounded-lg px-4 py-2 text-sm font-medium transition focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2",
+                  tab === t.id
+                    ? "bg-indigo-600 text-white shadow-sm"
+                    : "text-slate-600 hover:bg-slate-50"
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
+          <div className="relative w-full max-w-md">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+            <input
+              type="search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search title, client, or type…"
+              className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              aria-label="Search projects"
+            />
+          </div>
         </div>
-        <div className="relative w-full max-w-md">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          <input
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Search title, client, or type…"
-            className="w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-3 text-sm text-slate-900 shadow-sm placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-            aria-label="Search projects"
-          />
-        </div>
+
+        {projects.length === 0 ? (
+          <div className="mt-10">
+            <EmptyState
+              icon={FolderOpen}
+              title="No projects yet"
+              description="Create your first brief to get started."
+              action={{ label: "New Brief", href: "/projects/new" }}
+            />
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="mt-10 rounded-xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
+            <p className="font-medium text-slate-800">No projects match your filters</p>
+            <p className="mt-1 text-sm text-slate-600">Try another tab or clear your search.</p>
+          </div>
+        ) : (
+          <div className="mt-8 grid gap-4 lg:grid-cols-2">
+            {filtered.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
+          </div>
+        )}
       </div>
-
-      {filtered.length === 0 ? (
-        <div className="mt-10 rounded-xl border border-dashed border-slate-200 bg-white p-12 text-center shadow-sm">
-          <p className="font-medium text-slate-800">No projects match your filters</p>
-          <p className="mt-1 text-sm text-slate-600">Try another tab or clear your search.</p>
-        </div>
-      ) : (
-        <div className="mt-8 grid gap-4 lg:grid-cols-2">
-          {filtered.map((project) => (
-            <ProjectCard key={project.id} project={project} />
-          ))}
-        </div>
-      )}
-    </div>
+    </RequireRole>
   )
 }

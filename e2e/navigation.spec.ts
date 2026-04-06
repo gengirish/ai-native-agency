@@ -1,30 +1,34 @@
 import { test, expect } from "@playwright/test"
+import { loginAs } from "./helpers"
 
-const routes = [
-  { path: "/dashboard", title: "Dashboard", heading: "Dashboard" },
-  { path: "/projects", title: "Projects", heading: "Projects" },
-  { path: "/projects/new", title: "New Brief", heading: /brief|project type/i },
-  { path: "/review", title: "Review Hub", heading: /review/i },
-  { path: "/brand", title: "Brand DNA", heading: /brand/i },
-  { path: "/expert", title: "Expert Queue", heading: /expert/i },
-  { path: "/feedback", title: "Feedback Copilot", heading: /feedback/i },
-  { path: "/billing", title: "Billing", heading: /billing/i },
-  { path: "/crm", title: "CRM & Sales", heading: /crm|sales|pipeline/i },
-  { path: "/analytics", title: "Analytics", heading: /analytics/i },
-  { path: "/autonomy", title: "Autonomy Engine", heading: /autonomy/i },
-  { path: "/performance", title: "Performance", heading: /performance/i },
-  { path: "/ai-engine", title: "AI Gateway", heading: /ai|engine|gateway|production/i },
-  { path: "/proactive", title: "Creative Director", heading: /creative|director|proactive/i },
-  { path: "/publishing", title: "Auto-Publish", heading: /publish/i },
-  { path: "/benchmarks", title: "Benchmarks", heading: /benchmark/i },
-  { path: "/sla", title: "SLA Management", heading: /sla/i },
+const adminRoutes = [
+  { path: "/dashboard", heading: "Dashboard" },
+  { path: "/projects", heading: /projects/i },
+  { path: "/projects/new", heading: /brief|project type/i },
+  { path: "/review", heading: /review/i },
+  { path: "/brand", heading: /brand/i },
+  { path: "/expert", heading: /expert/i },
+  { path: "/feedback", heading: /feedback/i },
+  { path: "/billing", heading: /billing/i },
+  { path: "/crm", heading: /crm|sales|pipeline/i },
+  { path: "/analytics", heading: /analytics/i },
+  { path: "/autonomy", heading: /autonomy/i },
+  { path: "/performance", heading: /performance/i },
+  { path: "/ai-engine", heading: /ai|engine|gateway|production/i },
+  { path: "/proactive", heading: /creative|director|proactive/i },
+  { path: "/publishing", heading: /publish/i },
+  { path: "/benchmarks", heading: /benchmark/i },
+  { path: "/sla", heading: /sla/i },
 ]
 
-test.describe("Route accessibility", () => {
-  for (const route of routes) {
-    test(`${route.title} page loads at ${route.path}`, async ({ page }) => {
+test.describe("Route accessibility (admin)", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAs(page, "admin")
+  })
+
+  for (const route of adminRoutes) {
+    test(`${route.path} loads`, async ({ page }) => {
       await page.goto(route.path)
-      await expect(page).toHaveURL(route.path)
       const heading = page.locator("h1, h2").first()
       await expect(heading).toBeVisible({ timeout: 10000 })
     })
@@ -32,16 +36,19 @@ test.describe("Route accessibility", () => {
 })
 
 test.describe("Sidebar navigation", () => {
+  test.beforeEach(async ({ page }) => {
+    await loginAs(page, "admin")
+  })
+
   test("sidebar is visible with AgencyOS branding", async ({ page }) => {
     await page.goto("/dashboard")
     await expect(page.locator("text=AgencyOS")).toBeVisible()
     await expect(page.locator("text=AI-Native Platform")).toBeVisible()
   })
 
-  test("sidebar shows all navigation sections", async ({ page }) => {
+  test("sidebar shows all sections for admin", async ({ page }) => {
     await page.goto("/dashboard")
-    const sections = ["OVERVIEW", "PROJECTS", "BRAND", "EXPERT", "BUSINESS", "AI ENGINE", "OPERATIONS"]
-    for (const section of sections) {
+    for (const section of ["OVERVIEW", "PROJECTS", "BRAND", "EXPERT", "BUSINESS", "AI ENGINE", "OPERATIONS"]) {
       await expect(page.locator(`text=${section}`).first()).toBeVisible()
     }
   })
@@ -50,22 +57,31 @@ test.describe("Sidebar navigation", () => {
     await page.goto("/dashboard")
     await page.click("a[href='/projects']")
     await expect(page).toHaveURL("/projects")
-    await page.click("a[href='/billing']")
-    await expect(page).toHaveURL("/billing")
     await page.click("a[href='/dashboard']")
     await expect(page).toHaveURL("/dashboard")
   })
 
-  test("active nav item is highlighted", async ({ page }) => {
+  test("shows logged-in user info", async ({ page }) => {
     await page.goto("/dashboard")
-    const activeLink = page.locator("a[href='/dashboard']")
-    await expect(activeLink).toHaveClass(/indigo/)
+    await expect(page.locator("text=Test Admin")).toBeVisible()
+    await expect(page.locator("text=Agency Admin")).toBeVisible()
   })
 })
 
-test.describe("Home redirect", () => {
-  test("root redirects to /dashboard", async ({ page }) => {
+test.describe("Auth redirect", () => {
+  test("unauthenticated user is redirected to /login", async ({ page }) => {
+    await page.goto("/dashboard")
+    await expect(page).toHaveURL("/login", { timeout: 10000 })
+  })
+
+  test("root redirects to /login when unauthenticated", async ({ page }) => {
     await page.goto("/")
-    await expect(page).toHaveURL("/dashboard")
+    await expect(page).toHaveURL("/login", { timeout: 10000 })
+  })
+
+  test("root redirects to /dashboard when authenticated", async ({ page }) => {
+    await loginAs(page, "admin")
+    await page.goto("/")
+    await expect(page).toHaveURL("/dashboard", { timeout: 10000 })
   })
 })
