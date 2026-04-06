@@ -16,8 +16,9 @@ test.describe("Dashboard", () => {
   })
 
   test("shows empty or data state for revenue chart", async ({ page }) => {
-    const chartOrEmpty = page.locator(".recharts-wrapper, text=/no data|no revenue/i").first()
-    await expect(chartOrEmpty).toBeVisible({ timeout: 10000 })
+    const chart = page.locator(".recharts-wrapper").first()
+    const empty = page.locator("text=/no data|no revenue/i").first()
+    await expect(chart.or(empty)).toBeVisible({ timeout: 10000 })
   })
 
   test("shows empty or data state for projects", async ({ page }) => {

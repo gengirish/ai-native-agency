@@ -111,8 +111,8 @@ test.describe("Login Page", () => {
   test("displays login form", async ({ page }) => {
     await page.goto("/login")
     await expect(page.locator("text=AgencyOS")).toBeVisible()
-    await expect(page.locator("text=Sign In")).toBeVisible()
-    await expect(page.locator("text=Register")).toBeVisible()
+    await expect(page.locator("text=Sign In").first()).toBeVisible()
+    await expect(page.locator("text=Register").first()).toBeVisible()
   })
 
   test("shows registration form with role selection", async ({ page }) => {
