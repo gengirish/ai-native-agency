@@ -44,11 +44,8 @@ test.describe("Billing", () => {
 
   test("displays invoices", async ({ page }) => {
     await page.goto("/billing")
-    const invoicesTab = page.locator("text=/invoices/i").first()
-    if (await invoicesTab.isVisible()) {
-      await invoicesTab.click()
-    }
-    await expect(page.locator("text=/lumina|techflow/i").first()).toBeVisible()
+    await page.getByRole("button", { name: "Invoices" }).click()
+    await expect(page.locator("text=Lumina Brands").first()).toBeVisible({ timeout: 10000 })
   })
 })
 
