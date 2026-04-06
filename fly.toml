@@ -1,15 +1,7 @@
-# fly.toml app configuration file generated for ai-native-agency on 2026-04-05T23:40:53+05:30
-#
-# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
-#
-
 app = 'ai-native-agency'
 primary_region = 'iad'
 
 [build]
-
-[deploy]
-  release_command = "node db/migrate.js"
 
 [http_service]
   internal_port = 3000
