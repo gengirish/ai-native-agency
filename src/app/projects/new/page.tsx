@@ -13,18 +13,32 @@ import { BriefStepIndicator } from "@/components/brief/brief-step-indicator"
 import { BriefWizardNavigation } from "@/components/brief/brief-wizard-navigation"
 import { RequireRole } from "@/components/auth/require-role"
 import { DELIVERABLES_BY_TYPE } from "@/components/brief/deliverables-by-type"
-import { getBrandProfiles } from "@/lib/api"
+import { createProject, getBrandProfiles } from "@/lib/api"
+import { useAuth } from "@/lib/auth/context"
 import type { BrandProfile } from "@/types"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ArrowLeft } from "lucide-react"
+
+const BRIEF_CREATED_FLAG = "agencyos:brief-project-created"
+
+function parseBudgetAmount(raw: string): number | undefined {
+  const cleaned = raw.replace(/[$,\s]/g, "").trim()
+  if (!cleaned) return undefined
+  const n = Number(cleaned)
+  return Number.isFinite(n) ? n : undefined
+}
 
 const TOTAL_STEPS = 5
 
 export default function NewBriefPage() {
+  const router = useRouter()
+  const { user } = useAuth()
   const [step, setStep] = useState(1)
   const [form, setForm] = useState<BriefWizardFormState>(createInitialBriefFormState)
-  const [submitted, setSubmitted] = useState(false)
+  const [submitting, setSubmitting] = useState(false)
+  const [submitError, setSubmitError] = useState<string | null>(null)
   const [brandProfiles, setBrandProfiles] = useState<BrandProfile[]>([])
 
   const prevTypeRef = useRef(form.projectType)
@@ -58,15 +72,50 @@ export default function NewBriefPage() {
     })
   }, [step, form.projectType])
 
+  const submitBrief = useCallback(async () => {
+    if (submitting) return
+    if (!form.projectType) {
+      setSubmitError("Choose a project type before submitting.")
+      return
+    }
+    setSubmitError(null)
+    setSubmitting(true)
+    const clientName = user?.name?.trim() || "Demo Client"
+    const dueDate = form.deadline.trim() || new Date().toISOString()
+    const budget = parseBudgetAmount(form.budget)
+    const project = await createProject({
+      title: form.title.trim(),
+      type: form.projectType,
+      priority: "medium",
+      clientName,
+      dueDate,
+      ...(budget !== undefined ? { budget } : {}),
+    })
+    setSubmitting(false)
+    if (!project) {
+      setSubmitError("Could not create the project. Please try again.")
+      return
+    }
+    try {
+      sessionStorage.setItem(BRIEF_CREATED_FLAG, "1")
+    } catch {
+      /* private mode */
+    }
+    router.push("/projects")
+  }, [form.budget, form.deadline, form.projectType, form.title, router, submitting, user?.name])
+
   const goNext = () => {
     if (step === TOTAL_STEPS) {
-      setSubmitted(true)
+      void submitBrief()
       return
     }
     setStep((s) => Math.min(TOTAL_STEPS, s + 1))
   }
 
-  const goBack = () => setStep((s) => Math.max(1, s - 1))
+  const goBack = () => {
+    if (submitting) return
+    setStep((s) => Math.max(1, s - 1))
+  }
 
   const canProceed = () => {
     if (step === 1) return form.projectType !== null
@@ -102,28 +151,7 @@ export default function NewBriefPage() {
 
   return (
     <RequireRole permission="projects:create">
-      {submitted ? (
-        <div className="p-8">
-          <div className="mx-auto max-w-lg rounded-xl border border-slate-200 bg-white p-10 text-center shadow-sm">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-green-100 text-green-700">
-              <span className="text-2xl" aria-hidden>
-                ✓
-              </span>
-            </div>
-            <h1 className="mt-6 text-xl font-semibold text-slate-900">Brief submitted</h1>
-            <p className="mt-2 text-sm text-slate-600">
-              Your brief is queued for routing. In production this would create a project and notify your team.
-            </p>
-            <Link
-              href="/projects"
-              className="mt-8 inline-flex rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
-            >
-              Back to projects
-            </Link>
-          </div>
-        </div>
-      ) : (
-        <div className="p-8">
+      <div className="p-8">
           <div className="mx-auto max-w-3xl">
             <Link
               href="/projects"
@@ -140,6 +168,15 @@ export default function NewBriefPage() {
               </p>
 
               <BriefStepIndicator currentStep={step} totalSteps={TOTAL_STEPS} />
+
+              {submitError ? (
+                <p
+                  className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800"
+                  role="alert"
+                >
+                  {submitError}
+                </p>
+              ) : null}
 
               <div className="min-h-[280px]">
                 {step === 1 && (
@@ -167,14 +204,14 @@ export default function NewBriefPage() {
                 showBack={step > 1}
                 onBack={goBack}
                 onNext={goNext}
-                nextDisabled={!canProceed()}
+                nextDisabled={!canProceed() || submitting}
                 isLastStep={step === TOTAL_STEPS}
+                isSubmitting={submitting}
                 nextLabel="Continue"
               />
             </div>
           </div>
         </div>
-      )}
     </RequireRole>
   )
 }

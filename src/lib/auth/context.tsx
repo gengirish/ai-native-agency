@@ -19,10 +19,36 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+const TOKEN_KEY = "agencyos_token"
 const STORAGE_KEY = "agencyos_auth"
 
-function generateUserId(): string {
-  return "u_" + Math.random().toString(36).substring(2, 10)
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null
+  try {
+    return localStorage.getItem(TOKEN_KEY)
+  } catch {
+    return null
+  }
+}
+
+function setAuthStorage(token: string, user: User) {
+  localStorage.setItem(TOKEN_KEY, token)
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(user))
+}
+
+function clearAuthStorage() {
+  localStorage.removeItem(TOKEN_KEY)
+  localStorage.removeItem(STORAGE_KEY)
+}
+
+async function readErrorMessage(res: Response): Promise<string> {
+  try {
+    const data = (await res.json()) as { error?: unknown }
+    if (typeof data.error === "string") return data.error
+  } catch {
+    // ignore
+  }
+  return res.statusText || "Request failed"
 }
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -33,16 +59,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   })
 
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY)
-      if (stored) {
-        const user = JSON.parse(stored) as User
-        setState({ user, isAuthenticated: true, isLoading: false })
-      } else {
-        setState((s) => ({ ...s, isLoading: false }))
+    let cancelled = false
+
+    async function hydrate() {
+      try {
+        const token = localStorage.getItem(TOKEN_KEY)
+
+        if (token) {
+          const res = await fetch("/api/auth/me", {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+
+          if (cancelled) return
+
+          if (res.ok) {
+            const data = (await res.json()) as { user: User }
+            setState({ user: data.user, isAuthenticated: true, isLoading: false })
+            return
+          }
+
+          if (res.status === 401) {
+            clearAuthStorage()
+            setState({ user: null, isAuthenticated: false, isLoading: false })
+            return
+          }
+
+          setState({ user: null, isAuthenticated: false, isLoading: false })
+          return
+        }
+
+        const stored = localStorage.getItem(STORAGE_KEY)
+        if (stored) {
+          const user = JSON.parse(stored) as User
+          if (!cancelled) {
+            setState({ user, isAuthenticated: true, isLoading: false })
+          }
+          return
+        }
+
+        if (!cancelled) setState((s) => ({ ...s, isLoading: false }))
+      } catch {
+        if (!cancelled) setState((s) => ({ ...s, isLoading: false }))
       }
-    } catch {
-      setState((s) => ({ ...s, isLoading: false }))
+    }
+
+    void hydrate()
+    return () => {
+      cancelled = true
     }
   }, [])
 
@@ -51,21 +114,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: "Email and password are required" }
     }
 
-    const usersRaw = localStorage.getItem("agencyos_users")
-    const users: User[] = usersRaw ? JSON.parse(usersRaw) : []
-    const found = users.find((u) => u.email === email)
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    })
 
-    if (!found) {
-      return { success: false, error: "Invalid email or password" }
+    if (!res.ok) {
+      const error = await readErrorMessage(res)
+      return { success: false, error }
     }
 
-    const passMap: Record<string, string> = JSON.parse(localStorage.getItem("agencyos_passwords") || "{}")
-    if (passMap[email] !== password) {
-      return { success: false, error: "Invalid email or password" }
-    }
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(found))
-    setState({ user: found, isAuthenticated: true, isLoading: false })
+    const data = (await res.json()) as { user: User; token: string }
+    setAuthStorage(data.token, data.user)
+    setState({ user: data.user, isAuthenticated: true, isLoading: false })
     return { success: true }
   }, [])
 
@@ -74,36 +136,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: false, error: "All fields are required" }
     }
 
-    const usersRaw = localStorage.getItem("agencyos_users")
-    const users: User[] = usersRaw ? JSON.parse(usersRaw) : []
+    const res = await fetch("/api/auth/register", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, email, password, role }),
+    })
 
-    if (users.some((u) => u.email === email)) {
-      return { success: false, error: "An account with this email already exists" }
+    if (!res.ok) {
+      const error = await readErrorMessage(res)
+      return { success: false, error }
     }
 
-    const newUser: User = {
-      id: generateUserId(),
-      name,
-      email,
-      role,
-      tenantId: "t_" + Math.random().toString(36).substring(2, 8),
-      createdAt: new Date().toISOString(),
-    }
-
-    users.push(newUser)
-    localStorage.setItem("agencyos_users", JSON.stringify(users))
-
-    const passMap: Record<string, string> = JSON.parse(localStorage.getItem("agencyos_passwords") || "{}")
-    passMap[email] = password
-    localStorage.setItem("agencyos_passwords", JSON.stringify(passMap))
-
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(newUser))
-    setState({ user: newUser, isAuthenticated: true, isLoading: false })
+    const data = (await res.json()) as { user: User; token: string }
+    setAuthStorage(data.token, data.user)
+    setState({ user: data.user, isAuthenticated: true, isLoading: false })
     return { success: true }
   }, [])
 
   const logout = useCallback(() => {
-    localStorage.removeItem(STORAGE_KEY)
+    clearAuthStorage()
     setState({ user: null, isAuthenticated: false, isLoading: false })
   }, [])
 
@@ -112,7 +163,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!state.user) return false
       return hasPermission(state.user.role, permission)
     },
-    [state.user]
+    [state.user],
   )
 
   return (

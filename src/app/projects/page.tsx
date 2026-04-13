@@ -24,6 +24,8 @@ import {
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 
+const BRIEF_CREATED_FLAG = "agencyos:brief-project-created"
+
 type StatusTab = "all" | "active" | "completed" | "draft"
 
 const ACTIVE_STATUSES: ProjectStatus[] = [
@@ -118,9 +120,21 @@ export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
   const [tab, setTab] = useState<StatusTab>("all")
   const [query, setQuery] = useState("")
+  const [createdToast, setCreatedToast] = useState(false)
 
   useEffect(() => {
     void getProjects().then(setProjects)
+  }, [])
+
+  useEffect(() => {
+    try {
+      if (sessionStorage.getItem(BRIEF_CREATED_FLAG) === "1") {
+        sessionStorage.removeItem(BRIEF_CREATED_FLAG)
+        setCreatedToast(true)
+      }
+    } catch {
+      /* private mode */
+    }
   }, [])
 
   const filtered = useMemo(() => {
@@ -146,6 +160,21 @@ export default function ProjectsPage() {
   return (
     <RequireRole permission="projects:view">
       <div className="p-8">
+        {createdToast ? (
+          <div
+            className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 shadow-sm"
+            role="status"
+          >
+            <span>Project created from your brief.</span>
+            <button
+              type="button"
+              onClick={() => setCreatedToast(false)}
+              className="shrink-0 rounded-md px-2 py-1 font-medium text-green-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
