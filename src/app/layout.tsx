@@ -8,7 +8,14 @@ const inter = Inter({ subsets: ["latin"] })
 
 export const metadata: Metadata = {
   title: "AgencyOS — AI-Native Agency Platform",
-  description: "The operating system for AI-powered agencies",
+  description:
+    "Operating system for AI-native agencies: briefs, brand DNA, expert QA, SLAs, and delivery economics in one control plane.",
+  openGraph: {
+    title: "AgencyOS — Operating system for AI-native agencies",
+    description:
+      "Ship client creative at software-like margins. One workflow from intake to performance — with metered AI and human review.",
+    type: "website",
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

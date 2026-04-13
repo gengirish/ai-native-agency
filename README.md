@@ -1,8 +1,38 @@
-# AI-Native Agency Platform
+# AI-Native Agency Platform (AgencyOS)
 
-This project is a backend for agencies that want software-like margins: instead of only selling tools, teams use AI internally to ship finished client work at premium positioning, with multi-tenant isolation, billing, expert review, and an AI production pipeline. The API is the contract between client portals, internal tools, and the orchestration layer described in [ARCHITECTURE.md](./ARCHITECTURE.md).
+**AgencyOS** is the operating system for AI-native agencies: one control plane for briefs, brand DNA, AI production pipelines, expert QA, SLAs, billing, and performance — so teams ship client work at software-like margins instead of stacking disconnected tools.
 
-## Quick Start
+The **Next.js app** under `src/app` is the investor-ready product surface (landing page + full app shell). The **Express API** under `src/server.js` and `src/routes` is the service layer described in [ARCHITECTURE.md](./ARCHITECTURE.md); wire it when you replace the typed client stubs in `src/lib/api.ts`.
+
+## Quick Start — Product UI (Next.js)
+
+**Prerequisites:** Node.js 18 or newer.
+
+1. Install dependencies and copy env (demo data is on by default):
+
+   ```bash
+   npm install
+   cp .env.example .env
+   ```
+
+2. Start the app:
+
+   ```bash
+   npm run dev
+   ```
+
+3. Open [http://localhost:3000](http://localhost:3000) — public landing; use **Get started** to register and explore a populated demo workspace. Set `NEXT_PUBLIC_USE_DEMO_DATA=false` in `.env` for empty API states while you integrate a real backend.
+
+4. Production build:
+
+   ```bash
+   npm run build
+   npm run start
+   ```
+
+## Quick Start — HTTP API (Express + Postgres)
+
+Use this when you run the Node API and migrations (see `package.json` scripts if your fork wires `db:migrate`).
 
 **Prerequisites**
 
@@ -11,31 +41,15 @@ This project is a backend for agencies that want software-like margins: instead 
 
 **Steps**
 
-1. Clone the repository and install dependencies:
+1. Install dependencies and configure `.env` (including `DATABASE_URL`).
 
-   ```bash
-   npm install
-   ```
-
-2. Copy environment template and fill in values:
-
-   ```bash
-   cp .env.example .env
-   ```
-
-3. Run migrations:
+2. Run migrations (when available in your branch):
 
    ```bash
    npm run db:migrate
    ```
 
-4. Start the server:
-
-   ```bash
-   npm run dev
-   ```
-
-   For production-style runs, use `npm run start`. The server listens on `PORT` (default `3000`).
+3. Start the API server (see your `package.json`; default listen is often `PORT` / `3000`).
 
 ## Architecture
 

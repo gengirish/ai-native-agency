@@ -1,0 +1,31 @@
+---
+description: Next.js App Router frontend — React, TypeScript, Tailwind, client API layer
+globs: ["src/app/**/*", "src/components/**/*", "src/lib/**/*.ts", "src/lib/**/*.tsx"]
+alwaysApply: false
+---
+
+# Next.js frontend (AgencyOS product UI)
+
+## Stack
+
+- **Framework:** Next.js 15 App Router (`src/app`)
+- **UI:** React 19, Tailwind CSS, `clsx` / `tailwind-merge`, Lucide icons
+- **Data:** `src/lib/api.ts` — typed async functions; replace bodies with `fetch` to the Express API when integrated
+- **Auth (demo):** `src/lib/auth/context.tsx` + `localStorage` — not production-grade
+
+## Conventions
+
+- Prefer **client components** only where needed (`"use client"`); keep server components default when you add RSC-friendly data loading later.
+- **Do not** mix Express `project.mdc` conventions (CommonJS, raw SQL) into React files — that rule applies to `src/server.js` and `src/routes`.
+- **Types:** Import shared models from `src/types`.
+- **Demo integrity:** Coherent copy and demo data (`src/lib/demo-data.ts`); do not imply live revenue/traction without real data sources.
+
+## File placement
+
+- Routes: `src/app/<segment>/page.tsx`
+- Shared UI: `src/components/`
+- Utilities: `src/lib/utils.ts`, `src/lib/api.ts`
+
+## Environment
+
+- `NEXT_PUBLIC_USE_DEMO_DATA` — controls demo stubs in `api.ts` (see `agencyos-yc-product` skill).

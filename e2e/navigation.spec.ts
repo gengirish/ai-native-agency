@@ -74,9 +74,11 @@ test.describe("Auth redirect", () => {
     await expect(page).toHaveURL("/login", { timeout: 10000 })
   })
 
-  test("root redirects to /login when unauthenticated", async ({ page }) => {
+  test("unauthenticated user sees public landing at /", async ({ page }) => {
     await page.goto("/")
-    await expect(page).toHaveURL("/login", { timeout: 10000 })
+    await expect(page).toHaveURL("/")
+    await expect(page.getByRole("heading", { name: /AI-native agencies/i })).toBeVisible({ timeout: 15000 })
+    await expect(page.getByRole("link", { name: /get started|launch agencyos/i }).first()).toBeVisible()
   })
 
   test("root redirects to /dashboard when authenticated", async ({ page }) => {

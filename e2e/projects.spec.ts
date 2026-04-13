@@ -13,7 +13,7 @@ test.describe("Projects list", () => {
 
   test("shows empty state or project list", async ({ page }) => {
     await page.goto("/projects")
-    const content = page.locator("text=/no projects|new brief/i").first()
+    const content = page.locator("text=/no projects yet|new brief|deliverables|lumen|pulse|northwind/i").first()
     await expect(content).toBeVisible({ timeout: 10000 })
   })
 })

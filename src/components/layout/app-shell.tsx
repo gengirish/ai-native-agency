@@ -10,12 +10,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const router = useRouter()
   const { isAuthenticated, isLoading } = useAuth()
   const isLoginPage = pathname === "/login"
+  const isLandingPage = pathname === "/"
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !isLoginPage) {
+    if (!isLoading && !isAuthenticated && !isLoginPage && !isLandingPage) {
       router.replace("/login")
     }
-  }, [isLoading, isAuthenticated, isLoginPage, router])
+  }, [isLoading, isAuthenticated, isLoginPage, isLandingPage, router])
 
   if (isLoading) {
     return (
@@ -25,7 +26,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     )
   }
 
-  if (isLoginPage) {
+  if (isLoginPage || isLandingPage) {
     return <>{children}</>
   }
 
