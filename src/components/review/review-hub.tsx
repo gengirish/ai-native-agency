@@ -1,7 +1,13 @@
 "use client"
 
 import { useCallback, useEffect, useMemo, useState } from "react"
-import { getDeliverables, getProjects, getReviews } from "@/lib/api"
+import {
+  addReviewComment,
+  getDeliverables,
+  getProjects,
+  getReviews,
+  updateReview as apiUpdateReview,
+} from "@/lib/api"
 import type { Deliverable, Project, Review, ReviewComment, UserRole } from "@/types"
 import { cn } from "@/lib/utils"
 import { RequireRole } from "@/components/auth/require-role"
@@ -82,12 +88,21 @@ export function ReviewHub() {
 
   const updateReview = useCallback((id: string, patch: Partial<Review>) => {
     setReviews((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
+    const apiPatch: { status?: string; rating?: number } = {}
+    if (patch.status !== undefined) apiPatch.status = patch.status
+    if (patch.rating !== undefined) apiPatch.rating = patch.rating
+    if (Object.keys(apiPatch).length > 0) void apiUpdateReview(id, apiPatch)
   }, [])
 
   const appendComment = useCallback((reviewId: string, comment: ReviewComment) => {
     setReviews((prev) =>
       prev.map((r) => (r.id === reviewId ? { ...r, comments: [...r.comments, comment] } : r)),
     )
+    void addReviewComment(reviewId, {
+      author: comment.author,
+      authorRole: comment.authorRole,
+      content: comment.content,
+    })
   }, [])
 
   const deliverable = selectedReview ? deliverablesById.get(selectedReview.deliverableId) : undefined

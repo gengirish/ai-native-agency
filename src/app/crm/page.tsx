@@ -8,7 +8,7 @@ import { LeadDetailPanel } from "@/components/crm/lead-detail-panel"
 import { PipelineStatsRow } from "@/components/crm/pipeline-stats"
 import { SpeculativeWorkSection } from "@/components/crm/speculative-work-section"
 import { EmptyState } from "@/components/ui/empty-state"
-import { getLeads } from "@/lib/api"
+import { getLeads, updateLeadStatus as apiUpdateLeadStatus } from "@/lib/api"
 
 export default function CrmPage() {
   const [leads, setLeads] = useState<Lead[]>([])
@@ -45,6 +45,7 @@ export default function CrmPage() {
     setLeads((prev) =>
       prev.map((l) => (l.id === leadId ? { ...l, status } : l))
     )
+    void apiUpdateLeadStatus(leadId, status)
   }
 
   function handleGenerateSample() {

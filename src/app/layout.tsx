@@ -6,7 +6,12 @@ import { AppShell } from "@/components/layout/app-shell"
 
 const inter = Inter({ subsets: ["latin"] })
 
+const BASE_URL = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : "http://localhost:3000"
+
 export const metadata: Metadata = {
+  metadataBase: new URL(BASE_URL),
   title: "AgencyOS — AI-Native Agency Platform",
   description:
     "Operating system for AI-native agencies: briefs, brand DNA, expert QA, SLAs, and delivery economics in one control plane.",
