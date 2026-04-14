@@ -20,8 +20,11 @@ description: >-
 | **Data Access Layer** | `src/lib/dal.ts`, `src/lib/db.ts` | Dual-mode: Neon Postgres when `DATABASE_URL` is set, in-memory store fallback. |
 | **API Routes (31)** | `src/app/api/**/route.ts` | Auth, CRUD, AI generation, feedback translation, expert/publish mutations — all use DAL. |
 | **Database** | `db/migrations/`, `db/seed.js` | 25+ Postgres tables, 9 migrations, idempotent seed script. |
+| **E2E Tests** | `e2e/*.spec.ts` | 55 Playwright tests — all passing against live deployment. |
 
 When editing API routes, always import from `@/lib/dal`, never from `@/lib/store`.
+
+**Full-stack sync:** When adding features, use the `full-stack-sync` skill to keep all 8 layers in sync (migration → DAL → route → api.ts → types → UI → seed → tests/docs).
 
 ## Demo vs production (integrity)
 
@@ -50,5 +53,6 @@ When editing API routes, always import from `@/lib/dal`, never from `@/lib/store
 
 ## Related skills
 
+- **full-stack-sync** — keep features, code, DB, seed, tests, and docs in sync.
 - **deploy-vercel** — ship the Next app.
 - **playwright-e2e** — smoke tests including `BASE_URL` against staging/production.

@@ -1,30 +1,48 @@
 ---
-description: Service layer patterns
-globs: ["src/services/**/*.js"]
+description: DAL (Data Access Layer) and service patterns
+globs: ["src/lib/dal.ts", "src/lib/db.ts", "db/**/*.js"]
 alwaysApply: false
 ---
 
-# Services
+# Data Access Layer & Services
 
-## Responsibility
+## DAL (`src/lib/dal.ts`)
 
-- Services are the **only** layer that executes database queries (via `db/connection.js`).
-- Service methods contain **business logic only**: no `req`, `res`, or `next` parameters.
+The DAL is the **single source of truth** for data access. Every function follows this pattern:
 
-## SQL
+```typescript
+export async function getThings(tenantId?: string): Promise<Thing[]> {
+  if (hasDb()) {
+    const sql = getDb()!
+    const rows = tenantId
+      ? await sql`SELECT * FROM things WHERE tenant_id = ${tenantId}::uuid ORDER BY created_at DESC`
+      : await sql`SELECT * FROM things ORDER BY created_at DESC`
+    return rows.map(mapThingRow)
+  }
+  return store.things
+}
+```
 
-- Use **parameterized** queries (`$1`, `$2`, …) exclusively. Never concatenate untrusted values into SQL strings.
-- For tenant-owned data, **always** constrain rows with `tenant_id` (and any other access rules) in `WHERE` clauses.
+## Rules
 
-## Return values and errors
+1. **Always check `hasDb()`** to branch between Postgres and in-memory.
+2. **Never use nested sql template fragments** — Neon doesn't support `sql` interpolation within tagged templates. Use explicit two-branch queries.
+3. **Map rows explicitly** in `map*Row` functions — convert `snake_case` columns to `camelCase` properties.
+4. **Money:** Store as cents in DB, return as dollars from DAL.
+5. **UUIDs:** Always cast with `::uuid` in queries.
+6. **In-memory path:** Use `store` from `@/lib/store` and `uid()` for ID generation.
 
-- Return **plain JavaScript objects** (or arrays of them), not raw `pg` row objects unless the project explicitly maps at the boundary.
-- On failure, **throw** custom errors (`ValidationError`, `NotFoundError`, `ForbiddenError`, `ConflictError`, etc.) from `src/utils/errors.js`. Do not return `{ error: ... }` objects from services.
+## Adding a new entity
 
-## AI calls
+1. Create migration in `db/migrations/NNN_description.sql`
+2. Add TypeScript interface in `src/types/index.ts`
+3. Add DAL functions (get, create, update) in `src/lib/dal.ts`
+4. Add seed data in `db/seed.js` and `src/lib/demo-data.ts`
+5. Add store property in `src/lib/store.ts`
 
-- For every call to external AI APIs, record cost through **`aiGateway.logCost()`** (or the current equivalent) so usage lands in **`ai_cost_log`**.
+## Database scripts (`db/`)
 
-## Testing
-
-- Keep services easy to unit test: deterministic inputs, injected dependencies where needed, no Express types.
+- Use CommonJS (`require` / `module.exports`)
+- Use `pg` client from `db/connection.js` (not Neon serverless)
+- Parameterized queries with `$1`, `$2`, etc.
+- Migrations are raw SQL, run via `db/migrate.js`

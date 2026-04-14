@@ -1,60 +1,56 @@
 ---
-description: API route patterns and conventions
-globs: ["src/routes/**/*.js"]
+description: Next.js API route patterns and conventions
+globs: ["src/app/api/**/*.ts"]
 alwaysApply: false
 ---
 
-# API routes
+# API Routes (Next.js App Router)
 
-## Router template
+## Route template
 
-Protected routes should authenticate and enforce tenant isolation before handlers:
+```typescript
+import { NextRequest, NextResponse } from "next/server"
+import { getUserFromRequest } from "@/lib/auth/jwt"
+import { dalFunction } from "@/lib/dal"
 
-```javascript
-const express = require('express');
-const router = express.Router();
-const { authenticate } = require('../middleware/auth');
-const { tenantIsolation } = require('../middleware/tenantIsolation');
-
-router.use(authenticate);
-router.use(tenantIsolation);
-
-router.get('/', async (req, res, next) => {
+export async function GET(request: NextRequest) {
   try {
-    const result = await service.method(req.tenantId, req.query);
-    res.json({ data: result });
-  } catch (err) {
-    next(err);
+    const user = await getUserFromRequest(request)
+    const data = await dalFunction(user?.tenantId)
+    return NextResponse.json({ data })
+  } catch {
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-});
+}
 ```
 
-Adjust `authenticate` / `tenantIsolation` only where a route is intentionally public (document why).
+## Data access
+
+- **Always** import from `@/lib/dal` — never from `@/lib/store` or `@/lib/db` directly.
+- The DAL handles Postgres vs in-memory branching automatically.
+
+## Auth
+
+- Use `getUserFromRequest(request)` from `@/lib/auth/jwt` to get the authenticated user.
+- It returns `{ id, email, role, tenantId }` or `null` if no valid token.
+- Public routes can skip auth; document why in a comment.
+
+## Response shapes
+
+- **GET (list):** `{ data: T[] }` — or `{ data, total, page, limit }` for paginated.
+- **GET (single):** `{ data: T }` or `{ error: "Not found" }` with 404.
+- **POST (create):** Return created object with 201.
+- **PATCH/PUT:** Return updated object with 200.
+- **DELETE:** Return `{ success: true }` with 200 or 204 with no body.
+- **Errors:** `{ error: "message" }` with appropriate status code.
 
 ## Validation
 
-- Validate request bodies (and relevant query params) **before** calling services. Use a shared `validateBody` helper once it exists; keep validation consistent across POST/PUT/PATCH routes.
+- Validate request bodies before calling DAL functions.
+- Return 400 with `{ error: "Specific validation message" }` on bad input.
 
-## Route ordering
+## File placement
 
-- Register **static path segments before parameterized routes** (e.g. `GET /stats` before `GET /:id`, `GET /defaults` before `GET /:id`).
-
-## Methods and status codes
-
-- **POST / PUT:** Validate input; return **201** for successful creation when a new resource is created, **200** for other successful mutations.
-- **DELETE:** **204** with no body when deletion succeeds, unless the API contract requires a JSON body.
-- **GET:** **200** with `{ data: ... }` (or paginated shape) on success.
-
-## Pagination
-
-- List endpoints should support `page` and `limit`.
-- Defaults: `page = 1`, `limit = 20`, **maximum** `limit = 100`.
-- Response: `{ data, total, page, limit }`.
-
-## Public endpoints
-
-- Apply stricter **rate limiting** to public or unauthenticated endpoints.
-
-## Tenancy
-
-- Pass `req.tenantId` into service calls for all tenant-scoped resources; never trust client-supplied tenant IDs over the authenticated context.
+- `src/app/api/<resource>/route.ts` — collection endpoints (GET list, POST create)
+- `src/app/api/<resource>/[id]/route.ts` — item endpoints (GET, PATCH, DELETE)
+- `src/app/api/<resource>/[id]/<action>/route.ts` — sub-resource or action endpoints

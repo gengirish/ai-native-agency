@@ -1,31 +1,45 @@
 ---
-description: Next.js App Router frontend — React, TypeScript, Tailwind, client API layer
-globs: ["src/app/**/*", "src/components/**/*", "src/lib/**/*.ts", "src/lib/**/*.tsx"]
+description: Next.js App Router frontend — React 19, TypeScript, Tailwind, client API layer
+globs: ["src/app/**/*.tsx", "src/components/**/*.tsx", "src/lib/api.ts", "src/lib/auth/**/*.ts", "src/lib/auth/**/*.tsx"]
 alwaysApply: false
 ---
 
-# Next.js frontend (AgencyOS product UI)
+# Next.js Frontend (AgencyOS)
 
 ## Stack
 
 - **Framework:** Next.js 15 App Router (`src/app`)
 - **UI:** React 19, Tailwind CSS, `clsx` / `tailwind-merge`, Lucide icons
-- **Data:** `src/lib/api.ts` — typed async functions; replace bodies with `fetch` to the Express API when integrated
-- **Auth (demo):** `src/lib/auth/context.tsx` + `localStorage` — not production-grade
+- **Data:** `src/lib/api.ts` — typed async functions that `fetch` from `/api/` routes
+- **Auth:** `src/lib/auth/context.tsx` — AuthProvider with JWT in localStorage + cookie
+
+## Data flow
+
+```
+Page/Component → src/lib/api.ts → fetch("/api/...") → API route → DAL → Postgres
+```
+
+- `api.ts` functions call API routes via `fetch`. They do NOT import demo data or store.
+- API routes use the DAL which handles Postgres vs in-memory automatically.
+- The `NEXT_PUBLIC_USE_DEMO_DATA` env var is **not read** by `api.ts` — data mode is controlled server-side by `DATABASE_URL`.
 
 ## Conventions
 
-- Prefer **client components** only where needed (`"use client"`); keep server components default when you add RSC-friendly data loading later.
-- **Do not** mix Express `project.mdc` conventions (CommonJS, raw SQL) into React files — that rule applies to `src/server.js` and `src/routes`.
-- **Types:** Import shared models from `src/types`.
-- **Demo integrity:** Coherent copy and demo data (`src/lib/demo-data.ts`); do not imply live revenue/traction without real data sources.
+- Use `"use client"` only where needed (state, effects, event handlers).
+- **Types:** Import from `@/types` for shared models.
+- **API calls:** Import from `@/lib/api` — never call `fetch("/api/...")` directly in components.
+- **Auth:** Use `useAuth()` hook from `@/lib/auth/context` for user state and login/logout.
 
 ## File placement
 
 - Routes: `src/app/<segment>/page.tsx`
-- Shared UI: `src/components/`
-- Utilities: `src/lib/utils.ts`, `src/lib/api.ts`
+- Layouts: `src/app/<segment>/layout.tsx`
+- Shared UI: `src/components/<feature>/`
+- Utilities: `src/lib/`
 
-## Environment
+## Auth context
 
-- `NEXT_PUBLIC_USE_DEMO_DATA` — controls demo stubs in `api.ts` (see `agencyos-yc-product` skill).
+- `AuthProvider` wraps the app in `src/app/layout.tsx`
+- On mount, calls `GET /api/auth/me` to hydrate user from JWT
+- Exposes `user`, `login()`, `register()`, `logout()`
+- JWT stored in `localStorage` ("agencyos_token") + cookie ("agencyos_token")

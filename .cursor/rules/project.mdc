@@ -1,75 +1,73 @@
 ---
-description: AI-Native Agency Platform conventions and patterns
-globs: ["src/**/*.js", "db/**/*.js"]
+description: Full-stack AgencyOS conventions — Next.js 15, Neon Postgres, DAL, TypeScript
+globs: ["src/**/*.ts", "src/**/*.tsx", "db/**/*.js", "db/**/*.sql", "e2e/**/*.ts"]
 alwaysApply: true
 ---
 
-# AI-Native Agency Platform
+# AgencyOS — Full-Stack Conventions
 
 ## Stack
 
-- **Runtime:** Node.js
-- **HTTP:** Express
-- **Database:** PostgreSQL (Neon)
-- **Modules:** CommonJS only (`require` / `module.exports`). No ES modules. No TypeScript.
+- **Framework:** Next.js 15 (App Router) + React 19 + TypeScript
+- **Database:** Neon Postgres (`@neondatabase/serverless` for API routes, `pg` for CLI scripts)
+- **Data access:** `src/lib/dal.ts` — dual-mode DAL (Postgres when `DATABASE_URL` set, in-memory fallback)
+- **Auth:** Custom JWT + bcrypt (no NextAuth)
+- **Deploy:** Vercel
+- **Tests:** Playwright E2E (55 tests)
 
 ## Data access
 
-- No ORM. Use raw SQL through `db/connection.js` and its `query` function.
-- **SQL:** Parameterized placeholders only (`$1`, `$2`, …). Never build queries with string concatenation of user input.
-- **Schema:** Tables and columns use `snake_case`.
-- **IDs:** UUIDs everywhere; generate with `gen_random_uuid()` in Postgres (or equivalent in migrations).
-- **Money:** Store amounts as **integers in cents**. Never use floating point for money.
+- **All API routes** import from `@/lib/dal`. Never import `@/lib/store` directly in routes.
+- `src/lib/db.ts` provides `getDb()` (tagged-template SQL) and `hasDb()` (boolean).
+- **SQL pattern:** Use Neon tagged templates: `` sql`SELECT * FROM users WHERE id = ${id}::uuid` ``
+- **No nested sql fragments:** Neon's driver doesn't support conditional `sql` fragment interpolation. Use two-branch queries:
+
+```typescript
+const rows = tenantId
+  ? await sql`SELECT * FROM t WHERE tenant_id = ${tenantId}::uuid`
+  : await sql`SELECT * FROM t`
+```
+
+- **Schema:** Tables and columns use `snake_case`. DAL `map*Row` functions convert to `camelCase`.
+- **IDs:** UUIDs everywhere; cast with `::uuid` in queries. Generate with `gen_random_uuid()` in Postgres.
+- **Money:** Store as **integers in cents**. Convert to dollars at the DAL boundary.
 - **Time:** Columns as `TIMESTAMPTZ`; serialize to clients as ISO 8601 strings.
 
 ## Multi-tenancy
 
-- Every tenant-scoped route must scope data by `req.tenantId` (set after auth + tenant middleware).
-- Service-layer queries that touch tenant data must include `tenant_id` in `WHERE` clauses appropriately.
+- All tenant-scoped DAL functions accept an optional `tenantId` parameter.
+- Include `tenant_id` in WHERE clauses for tenant-scoped data.
 
-## HTTP and responses
+## API routes (`src/app/api/**/route.ts`)
 
-- **Errors:** `{ error: { message, code } }` (aligned with `errorHandler` and custom errors).
+- **Errors:** `{ error: "message" }` or `{ error: { message, code } }` with appropriate HTTP status.
 - **Successful reads:** `{ data: ... }`.
-- **Successful mutations:** `{ success: true, data: ... }` where applicable.
-- **Pagination:** Accept `page` and `limit`; return `{ data, total, page, limit }`.
-
-## Routes
-
-- Wrap async handlers in `try/catch` and call `next(err)` on failure.
-- Prefer the patterns in `.cursor/rules/api-routes.mdc`.
-
-## Custom errors (`src/utils/errors.js`)
-
-- `ValidationError` → 400
-- `ForbiddenError` → 403
-- `NotFoundError` → 404
-- `ConflictError` → 409
+- **Successful mutations:** Return the updated/created object.
+- Wrap handlers in `try/catch`, return 500 on unexpected errors.
 
 ## Auth and roles
 
-- **Header:** `Authorization: Bearer <token>` (decoded by auth middleware).
-- **`req.user`:** `{ id, tenantId, role }`.
+- **Header:** `Authorization: Bearer <token>` (validated by `getUserFromRequest` in `jwt.ts`).
 - **Roles:** `admin`, `expert`, `client`.
+- **Middleware:** `src/middleware.ts` checks for `agencyos_token` cookie on protected routes.
 
 ## AI usage
 
-- Log every AI API call cost to the `ai_cost_log` table (via `aiGateway.logCost()` or the established helper).
+- Use `src/lib/ai/gateway.ts` for all AI calls (failover: OpenRouter → Groq → Gemini).
+
+## Feature development order
+
+1. Database migration (`db/migrations/`)
+2. DAL function (`src/lib/dal.ts`) — both Postgres and in-memory paths
+3. API route (`src/app/api/`)
+4. Client API function (`src/lib/api.ts`)
+5. UI component/page
+6. E2E test (`e2e/`)
+7. Seed data update (`db/seed.js` + `src/lib/demo-data.ts`)
+8. Docs update (AGENTS.md, rules, skills)
 
 ## Code style
 
-- **JavaScript:** `camelCase` for variables and functions.
-- **Files:** `camelCase.js` for services, utils, and route modules.
-
-## Secrets
-
-- Never commit `.env`. Document variables in `.env.example` only.
-
-## Feature order
-
-When adding a feature, follow this order:
-
-1. Database migration (`db/migrations/`)
-2. Service method (`src/services/`)
-3. Route (`src/routes/`)
-4. Tests
+- **TypeScript** for all `src/` files. **CommonJS** only for `db/` scripts.
+- `camelCase` for variables and functions. `snake_case` in SQL.
+- Never commit `.env`. Document variables in `.env.example`.
