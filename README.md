@@ -1,222 +1,319 @@
-# AI-Native Agency Platform (AgencyOS)
+# AgencyOS — AI-Native Agency Platform
 
-**AgencyOS** is the operating system for AI-native agencies: one control plane for briefs, brand DNA, AI production pipelines, expert QA, SLAs, billing, and performance — so teams ship client work at software-like margins instead of stacking disconnected tools.
+**AgencyOS** is the operating system for AI-native creative agencies. One control plane for project briefs, brand DNA, AI production pipelines, expert QA, SLA tracking, billing, and performance analytics — so teams ship client work at software-like margins.
 
-The **Next.js app** under `src/app` is the investor-ready product surface (landing page + full app shell). The **Express API** under `src/server.js` and `src/routes` is the service layer described in [ARCHITECTURE.md](./ARCHITECTURE.md); wire it when you replace the typed client stubs in `src/lib/api.ts`.
+**Live demo:** [agencyos.intelliforge.tech](https://agencyos.intelliforge.tech)
 
-## Quick Start — Product UI (Next.js)
+---
 
-**Prerequisites:** Node.js 18 or newer.
+## Investor Demo Walkthrough
 
-1. Install dependencies and copy env (demo data is on by default):
+The platform ships with pre-seeded data and one-click login for three roles. No setup required — just open the live URL.
 
-   ```bash
-   npm install
-   cp .env.example .env
-   ```
+### Step 1 — Login (one click)
 
-2. Start the app:
+Visit `/login`. Three demo accounts are available with instant access:
 
-   ```bash
-   npm run dev
-   ```
+| Button | Role | Name | What they see |
+|--------|------|------|---------------|
+| **Agency Admin** | `admin` | Priya Kapoor | Full platform — all 17 modules |
+| **Expert Reviewer** | `expert` | Maya Okonkwo | Review queue, QA, deliverable feedback |
+| **Client** | `client` | Sarah Chen | Projects, brand assets, billing |
 
-3. Open [http://localhost:3000](http://localhost:3000) — public landing; use **Get started** to register and explore a populated demo workspace. Set `NEXT_PUBLIC_USE_DEMO_DATA=false` in `.env` for empty API states while you integrate a real backend.
+### Step 2 — Dashboard
 
-4. Production build:
+Revenue metrics ($857K total, 66% margins), active project count, pipeline value, AI autonomous rate, expert utilization — all from seeded data that tells a coherent business story.
 
-   ```bash
-   npm run build
-   npm run start
-   ```
+### Step 3 — Projects & AI Generation
 
-## Quick Start — HTTP API (Express + Postgres)
+- **Seeded projects:** 6 projects across logo design, social media, brand identity, ad creative, email campaigns, and marketing collateral — each at different pipeline stages.
+- **View AI Output:** Click any project with deliverables to see AI-generated content (the Apex Freight logo project has a pre-seeded 3-concept creative brief).
+- **Live AI generation:** Submit a new brief through the wizard → the platform calls a real AI model (OpenRouter → Groq → Gemini fallback chain) and shows the generated deliverable with model, latency, token count, and cost metrics.
 
-Use this when you run the Node API and migrations (see `package.json` scripts if your fork wires `db:migrate`).
+### Step 4 — Full Platform Tour
 
-**Prerequisites**
+| Module | Route | Highlights |
+|--------|-------|------------|
+| Review Hub | `/review` | Threaded feedback between clients and experts |
+| Brand DNA | `/brand` | Color palettes, fonts, tone-of-voice, DNA scores |
+| CRM & Sales | `/crm` | 4 leads ($284K pipeline), drag-drop status |
+| AI Gateway | `/ai-engine` | Model registry, pipeline visualization, live task status |
+| Autonomy Engine | `/autonomy` | Per-task-type confidence → human-required / spot-check / autonomous |
+| Expert Queue | `/expert` | Assignment routing, escalation levels, quality deltas |
+| Performance | `/performance` | CTR, ROI, spend by channel with real ad metrics |
+| Creative Director | `/proactive` | AI-suggested upsells based on trends |
+| Auto-Publish | `/publishing` | Channel integrations (Meta, Google, IG, Mailchimp) |
+| Benchmarks | `/benchmarks` | Industry comparison — turnaround, satisfaction, margin |
+| SLA Management | `/sla` | Tier-based SLAs with compliance tracking |
+| Billing | `/billing` | Invoices, credit packs, usage records |
+| Analytics | `/analytics` | Revenue trends, cost breakdown, margin analysis |
+| Feedback Copilot | `/feedback` | Client feedback → structured actionable items |
 
-- Node.js 18 or newer
-- A PostgreSQL database ([Neon](https://neon.tech) or any Postgres with `DATABASE_URL` and SSL as required)
+### Step 5 — Role Switching
 
-**Steps**
+Log out and one-click into a different role to demonstrate RBAC. Experts see a subset (review queue, QA). Clients see only their projects and billing.
 
-1. Install dependencies and configure `.env` (including `DATABASE_URL`).
+---
 
-2. Run migrations (when available in your branch):
+## Quick Start (Local Development)
 
-   ```bash
-   npm run db:migrate
-   ```
+**Prerequisites:** Node.js 18+
 
-3. Start the API server (see your `package.json`; default listen is often `PORT` / `3000`).
-
-## Architecture
-
-The platform is described as a **six-layer model** plus a **Human Expert** layer that runs alongside the AI engine: client experience, API gateway and authentication, core platform services, AI production, knowledge and data, and infrastructure, with experts handling review, refinement, and escalation. This repository implements the **HTTP API**, **middleware**, **services**, and **database** pieces; see [ARCHITECTURE.md](./ARCHITECTURE.md) for the full conceptual map and product layers.
-
-## Project Structure
-
-```text
-src/
-├── server.js                 Express app: global middleware, health check, route mounts, error handler
-├── middleware/
-│   ├── auth.js               Bearer JWT (or token) parsing; attaches req.user
-│   ├── tenantIsolation.js    Ensures req.tenantId and tenant-safe access
-│   └── errorHandler.js       Maps errors to HTTP responses
-├── routes/                   One module per REST resource area; thin handlers, delegate to services
-│   ├── analytics.js
-│   ├── billing.js
-│   ├── brands.js
-│   ├── briefs.js
-│   ├── deliverables.js
-│   ├── experts.js
-│   ├── feedback.js
-│   ├── pipeline.js
-│   ├── projects.js
-│   └── templates.js
-├── services/                 Business logic and all database access; AI gateway usage and cost logging
-│   ├── aiGateway.js
-│   ├── billingService.js
-│   ├── brandService.js
-│   ├── briefService.js
-│   ├── clientFeedbackService.js
-│   ├── deliverableService.js
-│   ├── expertReviewService.js
-│   ├── modelRouter.js
-│   ├── pipelineOrchestrator.js
-│   ├── projectService.js
-│   ├── qaService.js
-│   ├── qualityService.js
-│   ├── taskDecomposer.js
-│   ├── templateService.js
-│   └── vectorStoreService.js
-└── utils/
-    └── errors.js             AppError, ValidationError, NotFoundError, ForbiddenError, ConflictError
-
-db/
-├── connection.js             pg Pool and query helper
-├── migrate.js                Runs ordered SQL files from db/migrations/
-├── reset.js                  Drops public tables (requires --yes); then re-run migrate
-└── migrations/               Versioned .sql migrations
+```bash
+git clone https://github.com/gengirish/ai-native-agency.git
+cd ai-native-agency
+npm install
+cp .env.example .env    # then add your API keys
+npm run dev
 ```
 
-## API Endpoints
+Open [http://localhost:3000](http://localhost:3000). Demo users work out of the box.
 
-Base path for mounted routers is `/api`. Method and path are shown relative to each mount.
+### Environment Variables
 
-| Resource | Method | Path | Notes |
-|----------|--------|------|--------|
-| **Health** | GET | `/api/health` | DB connectivity check |
-| **Projects** | GET | `/api/projects/stats` | Static route before `/:id` |
-| | POST | `/api/projects` | Create |
-| | GET | `/api/projects` | List |
-| | GET | `/api/projects/:id` | Detail |
-| | PATCH | `/api/projects/:id/status` | Status update |
-| | PATCH | `/api/projects/:id/assign` | Assignment |
-| **Briefs** | POST | `/api/briefs` | Create |
-| | GET | `/api/briefs/:id` | Detail |
-| | PUT | `/api/briefs/:id` | Update |
-| | POST | `/api/briefs/:id/submit` | Submit |
-| **Brands** | POST | `/api/brands/extract` | Extract (static before `/:id`) |
-| | POST | `/api/brands` | Create |
-| | GET | `/api/brands` | List |
-| | GET | `/api/brands/:id/context` | Context |
-| | GET | `/api/brands/:id/assets` | Assets |
-| | DELETE | `/api/brands/:id/assets/:assetId` | Remove asset |
-| | POST | `/api/brands/:id/assets` | Add asset |
-| | GET | `/api/brands/:id` | Detail |
-| | PUT | `/api/brands/:id` | Update |
-| | DELETE | `/api/brands/:id` | Delete |
-| **Deliverables** | POST | `/api/deliverables` | Create |
-| | GET | `/api/deliverables/project/:projectId/history` | History |
-| | GET | `/api/deliverables/project/:projectId` | By project |
-| | PATCH | `/api/deliverables/:id/status` | Status |
-| | POST | `/api/deliverables/:id/version` | New version |
-| | GET | `/api/deliverables/:id` | Detail |
-| **Billing** | GET | `/api/billing/balance` | Balance |
-| | POST | `/api/billing/balance/initialize` | Admin |
-| | POST | `/api/billing/credits/add` | Admin |
-| | POST | `/api/billing/invoices` | Create invoice |
-| | GET | `/api/billing/invoices` | List invoices |
-| | PATCH | `/api/billing/invoices/:id/status` | Invoice status |
-| **Experts** | GET | `/api/experts/reviews/pending` | Pending reviews |
-| | GET | `/api/experts/reviews/mine` | Current user’s reviews |
-| | POST | `/api/experts/reviews` | Create review |
-| | GET | `/api/experts/reviews/:id` | Review detail |
-| | POST | `/api/experts/reviews/:id/claim` | Claim |
-| | POST | `/api/experts/reviews/:id/approve` | Approve |
-| | POST | `/api/experts/reviews/:id/revise` | Request revision |
-| | POST | `/api/experts/reviews/:id/escalate` | Escalate |
-| | GET | `/api/experts/workload` | Workload |
-| | POST | `/api/experts/auto-assign` | Auto-assign |
-| | GET | `/api/experts/performance` | Performance |
-| | GET | `/api/experts/leaderboard` | Leaderboard |
-| **Pipeline** | POST | `/api/pipeline/run` | Run pipeline |
-| | GET | `/api/pipeline/project/:projectId` | By project |
-| | GET | `/api/pipeline/:id` | Run detail |
-| | POST | `/api/pipeline/:id/retry` | Retry |
-| **Templates** | POST | `/api/templates` | Create (auth) |
-| | GET | `/api/templates/defaults` | Defaults |
-| | GET | `/api/templates/best/:projectType` | Best for type |
-| | GET | `/api/templates` | List |
-| | GET | `/api/templates/:id` | Detail |
-| | PUT | `/api/templates/:id` | Update (auth) |
-| **Analytics** | GET | `/api/analytics/quality/project/:projectId` | Quality by project |
-| | GET | `/api/analytics/quality/trends` | Quality trends |
-| | GET | `/api/analytics/experts/performance/:expertId` | Expert performance |
-| | GET | `/api/analytics/experts/top` | Top experts |
-| | GET | `/api/analytics/costs/summary` | AI cost summary |
-| | GET | `/api/analytics/revenue/summary` | Revenue summary |
-| **Feedback** | POST | `/api/feedback` | Submit feedback |
-| | GET | `/api/feedback/deliverable/:deliverableId` | By deliverable |
-| | GET | `/api/feedback/project/:projectId` | By project |
-| | GET | `/api/feedback/project/:projectId/revisions` | Revisions |
-| | GET | `/api/feedback/project/:projectId/approved` | Approved |
-
-## Environment Variables
+Create `.env` from `.env.example`:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
-| `DATABASE_URL` | Yes | PostgreSQL connection string (SSL as needed for Neon) |
-| `NODE_ENV` | Recommended | `development` or `production` |
-| `PORT` | No | HTTP port (default `3000`) |
-| `OPENAI_API_KEY` | For OpenAI | Used by `aiGateway` for OpenAI calls |
-| `ANTHROPIC_API_KEY` | For Anthropic | Used by `aiGateway` for Anthropic calls |
+| `OPENROUTER_API_KEY` | For AI generation | Primary AI provider ([openrouter.ai](https://openrouter.ai)) |
+| `GROQ_API_KEY` | Fallback | Fast inference fallback ([console.groq.com](https://console.groq.com)) |
+| `GEMINI_API_KEY` | Fallback | Google Gemini fallback ([aistudio.google.com](https://aistudio.google.com)) |
+| `TAVILY_API_KEY` | Optional | Search-enriched generation (future) |
+| `PERPLEXITY_API_KEY` | Optional | Search-enriched generation (future) |
+| `DATABASE_URL` | Optional | PostgreSQL (for future real backend) |
+| `NEXT_PUBLIC_USE_DEMO_DATA` | Optional | `true` (default) seeds demo data; `false` for empty state |
 
-Never commit `.env`. Copy from `.env.example` and keep secrets local or in your deployment environment.
+**Never commit `.env`** — it is gitignored. API keys are set on Vercel via `vercel env add`.
 
-## Database
+---
 
-- **Migrate:** `npm run db:migrate` runs SQL files in `db/migrations/` in filename order and records them in `schema_migrations`.
-- **Reset (destructive):** `npm run db:reset -- --yes` drops all tables in `public`. Then run `npm run db:migrate` to rebuild.
-- **New migration:** Add a new `.sql` file under `db/migrations/` with a sortable name (e.g. `002_add_feature.sql`). Follow the team order: migration first, then service, then route, then tests.
+## Architecture
 
-## Development
+```
+┌─────────────────────────────────────────────────────┐
+│                    Next.js 15 App                    │
+│  ┌───────────┐  ┌──────────┐  ┌──────────────────┐  │
+│  │  App      │  │  API     │  │  Middleware       │  │
+│  │  Router   │  │  Routes  │  │  (JWT cookie      │  │
+│  │  (React   │  │  (28     │  │   gate)           │  │
+│  │   19 +    │  │  route   │  └──────────────────┘  │
+│  │   Tailwind│  │  handlers│                        │
+│  │   CSS)    │  │  )       │  ┌──────────────────┐  │
+│  │           │  │          │  │  AI Gateway       │  │
+│  │  17 pages │  │  CRUD +  │  │  OpenRouter →     │  │
+│  │  + brief  │  │  auth +  │  │  Groq → Gemini   │  │
+│  │  wizard   │  │  generate│  │  (auto failover)  │  │
+│  └───────────┘  └──────────┘  └──────────────────┘  │
+│                                                     │
+│  ┌──────────────────────────────────────────────┐   │
+│  │  In-Memory Store (globalThis)                 │   │
+│  │  Seeded from demo-data.ts on cold start       │   │
+│  │  4 demo users · 6 projects · deliverables ·   │   │
+│  │  reviews · leads · pipelines · brands · ...   │   │
+│  └──────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+- **In-memory store over database for demos:** `src/lib/store.ts` uses `globalThis` to persist across API requests within a single serverless instance. Resets on cold start — fine for demos, replaceable with Postgres/KV for production.
+- **Custom JWT auth (no NextAuth):** Lightweight JWT signing/verification via Web Crypto API in `src/lib/auth/jwt.ts`. Token stored in `localStorage` (API calls) + cookie (middleware gate). No external auth dependency.
+- **Multi-provider AI gateway:** `src/lib/ai/gateway.ts` routes through OpenRouter (primary), Groq (fast), Gemini (fallback) with automatic failover, cost estimation, and latency tracking.
+- **Seeded demo users:** 4 users pre-loaded with IDs matching project/review/expert data for a coherent narrative.
+
+---
+
+## Seeded Demo Data
+
+### Users
+
+| ID | Name | Email | Role | Password |
+|----|------|-------|------|----------|
+| `u_admin` | Priya Kapoor | admin@agencyos.demo | admin | demo123 |
+| `exp_maya` | Maya Okonkwo | maya@agencyos.demo | expert | demo123 |
+| `exp_jordan` | Jordan Lee | jordan@agencyos.demo | expert | demo123 |
+| `u_client_lumen` | Sarah Chen | sarah@agencyos.demo | client | demo123 |
+
+### Projects
+
+| ID | Title | Type | Status | Client |
+|----|-------|------|--------|--------|
+| `proj_lumen` | Lumen Analytics — full rebrand | Brand identity | Client review | Lumen Analytics |
+| `proj_pulse` | Pulse Health — Q2 social motion kit | Social media | Expert review | Pulse Health |
+| `proj_north` | Northwind — performance creative A/B | Ad creative | QA check | Northwind Commerce |
+| `proj_vertex` | Vertex Labs — investor one-pager + deck | Marketing collateral | Delivered | Vertex Labs |
+| `proj_apex` | Apex Freight — logo refinement | Logo design | QA check | Apex Freight |
+| `proj_kite` | Kite Bank — lifecycle email series | Email campaign | Draft | Kite Bank |
+
+### Additional Data
+
+- **4 deliverables** with version history and quality scores
+- **3 reviews** with threaded comments between clients and experts
+- **3 expert assignments** with escalation levels and quality deltas
+- **4 CRM leads** ($284K combined pipeline value)
+- **2 AI pipelines** (one running, one completed) with per-task cost tracking
+- **4 AI models** registered (Claude, GPT-4o, FLUX Pro, Runway Gen-3)
+- **2 brand profiles** with colors, fonts, tone of voice, DNA scores
+- **6 months of revenue data** ($118K → $168K trajectory)
+- **1 pre-seeded AI generation** (Apex Freight logo: 3 concept directions with rationale)
+
+---
+
+## API Routes
+
+All routes are Next.js Route Handlers under `src/app/api/`.
+
+### Authentication
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/auth/register` | Register with name, email, password, role → JWT |
+| POST | `/api/auth/login` | Login with email, password → JWT |
+| GET | `/api/auth/me` | Get current user from Bearer token |
+
+### AI Generation
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/generate` | Generate deliverable from brief (real AI call) |
+| GET | `/api/projects/[id]/generated` | Get seeded/cached generation result |
+
+### CRUD & Data
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET/POST | `/api/projects` | List / create projects |
+| GET/PATCH | `/api/projects/[id]` | Get / update project |
+| GET | `/api/reviews` | List reviews |
+| GET/PATCH | `/api/reviews/[id]` | Get / update review |
+| POST | `/api/reviews/[id]/comments` | Add comment to review |
+| GET | `/api/leads` | List CRM leads |
+| PATCH | `/api/leads/[id]` | Update lead status |
+| GET | `/api/brands` | List brand profiles |
+| GET | `/api/deliverables` | List deliverables |
+| GET | `/api/dashboard/stats` | Dashboard metrics |
+| GET | `/api/billing` | Invoices, credit packs, usage |
+| GET | `/api/pipelines` | AI pipeline runs |
+| GET | `/api/experts` | Expert assignments |
+| GET | `/api/models` | AI model registry |
+| GET | `/api/autonomy` | Autonomy configurations |
+| GET | `/api/performance` | Channel performance metrics |
+| GET | `/api/suggestions` | Proactive creative suggestions |
+| GET | `/api/feedback` | Feedback translations |
+| GET | `/api/publishing` | Publishing jobs + channel configs |
+| GET | `/api/benchmarks` | Industry benchmarks |
+| GET | `/api/sla` | SLA tiers + compliance |
+| GET | `/api/revenue` | Monthly revenue metrics |
+| GET | `/api/costs` | Cost breakdown |
+
+---
+
+## Auth System
+
+```
+Login page → POST /api/auth/login → JWT returned
+                                    ↓
+                        Stored in localStorage (API calls)
+                        + cookie "agencyos_token" (middleware)
+                                    ↓
+            Middleware checks cookie → redirect to /login if missing
+            API routes check Bearer header → 401 if invalid
+```
+
+- **RBAC:** 3 roles (admin, expert, client) with 30+ granular permissions
+- **Route gating:** `src/middleware.ts` redirects unauthenticated requests
+- **Component gating:** `<RequireRole permission="...">` wraps protected UI
+- **Permission matrix:** `src/lib/auth/permissions.ts`
+
+---
+
+## AI Gateway
+
+`src/lib/ai/gateway.ts` — unified `generate()` function with:
+
+- **Provider chain:** OpenRouter → Groq → Gemini (first available key wins)
+- **Auto-failover:** If primary returns non-200, tries next provider
+- **Cost estimation:** Per-provider token rates
+- **Latency tracking:** Wall-clock ms per generation
+- **Per-project-type prompts:** 9 tailored system prompts (logo, social, brand, video, legal, blog, email, ad, collateral)
+
+---
+
+## Scripts
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| Dev (watch) | `npm run dev` | Turbopack dev server |
-| Dev (E2E) | `npm run dev:e2e` | Playwright-friendly dev server |
-| Build | `npm run build` | Production build |
-| Start | `npm run start` | Run production build |
-| E2E tests | `npm run test:e2e` | Run Playwright test suite |
-| Migrate | `npm run db:migrate` | Apply pending migrations |
-| Reset | `npm run db:reset -- --yes` | Drop all public tables |
+| `npm run dev` | `next dev --turbopack` | Local dev with hot reload |
+| `npm run dev:e2e` | `next dev -H 127.0.0.1 -p 3000` | Playwright-compatible server |
+| `npm run build` | `next build` | Production build |
+| `npm run start` | `next start` | Run production build |
+| `npm run lint` | `next lint` | ESLint check |
+| `npm run test:e2e` | `playwright test` | Run E2E tests |
+| `npm run test:e2e:live` | `BASE_URL=... playwright test` | E2E against deployed URL |
+| `npm run test:e2e:ui` | `playwright test --ui` | Playwright UI mode |
 
-## Testing
+---
 
-- **E2E tests (Playwright):** `npm run test:e2e` — 65 tests covering all 17 routes, sidebar navigation, dashboard, brief builder, core features, and YC features. Set `BASE_URL` for deployed smoke tests. See `.cursor/skills/playwright-e2e/SKILL.md`.
-- **Unit tests:** Not yet wired in `package.json`. When added, the intended command is `npm test`.
+## Deployment
 
-## Cursor Skills Library
+Deployed on **Vercel**. See `.cursor/skills/deploy-vercel/SKILL.md`.
 
-This project includes 148 agent skills in `.cursor/skills/`. These are playbooks covering deployment, testing, frontend, backend, security, AI, business strategy, and more. See `AGENTS.md` for the full categorized inventory. To use a skill, read its `SKILL.md` before starting work in that domain.
+```bash
+npx vercel --prod --yes --scope girish-hiremaths-projects
+```
 
-## Contributing
+Environment variables are set via `vercel env add <KEY> production --value "<value>"`.
 
-- **Branches:** Use short, descriptive names (e.g. `feature/billing-credits`, `fix/tenant-scope-deliverables`).
-- **Commits:** Prefer imperative, present-tense subjects with enough body context when behavior changes (what and why, not implementation trivia).
+---
+
+## Tech Stack
+
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 15 (App Router) |
+| UI | React 19, Tailwind CSS, Lucide icons |
+| Charts | Recharts |
+| Auth | Custom JWT (Web Crypto API) |
+| AI | OpenRouter, Groq, Google Gemini |
+| State | In-memory store (`globalThis`) |
+| Deployment | Vercel (serverless) |
+| Testing | Playwright |
+| Language | TypeScript 5.7 |
+
+---
+
+## Project Structure
+
+```
+src/
+├── app/
+│   ├── api/                    28 API route handlers
+│   │   ├── auth/               login, register, me
+│   │   ├── generate/           AI generation endpoint
+│   │   ├── projects/           CRUD + generated results
+│   │   ├── reviews/            CRUD + comments
+│   │   └── ...                 leads, brands, billing, etc.
+│   ├── dashboard/              Main dashboard
+│   ├── projects/               Project list + brief wizard + AI results
+│   ├── login/                  Auth + one-click demo login
+│   └── ...                     16 more feature pages
+├── components/
+│   ├── auth/                   RequireRole, permission guards
+│   ├── brief/                  5-step brief wizard
+│   ├── layout/                 AppShell, sidebar, navigation
+│   ├── marketing/              Landing page
+│   ├── review/                 Review hub with threaded comments
+│   └── ui/                     Shared UI components
+├── lib/
+│   ├── ai/gateway.ts           Multi-provider AI gateway
+│   ├── auth/                   JWT, permissions, context
+│   ├── api.ts                  Client-side API functions
+│   ├── demo-data.ts            Seeded demo dataset
+│   ├── store.ts                In-memory data store
+│   └── utils.ts                Formatting helpers
+└── types/
+    └── index.ts                40+ TypeScript interfaces
+```
 
 ## License
 

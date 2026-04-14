@@ -30,7 +30,7 @@ const PROVIDER_CONFIG = {
     headers: (key: string) => ({
       Authorization: `Bearer ${key}`,
       "Content-Type": "application/json",
-      "HTTP-Referer": "https://agencyos.dev",
+      "HTTP-Referer": "https://agencyos.intelliforge.tech",
       "X-Title": "AgencyOS",
     }),
   },
