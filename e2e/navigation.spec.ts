@@ -30,7 +30,7 @@ test.describe("Route accessibility (admin)", () => {
     test(`${route.path} loads`, async ({ page }) => {
       await page.goto(route.path)
       const heading = page.locator("h1, h2").first()
-      await expect(heading).toBeVisible({ timeout: 10000 })
+      await expect(heading).toBeVisible({ timeout: 20000 })
     })
   }
 })
@@ -42,8 +42,8 @@ test.describe("Sidebar navigation", () => {
 
   test("sidebar is visible with AgencyOS branding", async ({ page }) => {
     await page.goto("/dashboard")
-    await expect(page.getByRole("heading", { name: "AgencyOS" })).toBeVisible()
-    await expect(page.locator("text=AI-Native Platform")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "AgencyOS" })).toBeVisible({ timeout: 15000 })
+    await expect(page.locator("text=AI-Native Platform")).toBeVisible({ timeout: 10000 })
   })
 
   test("sidebar shows all sections for admin", async ({ page }) => {

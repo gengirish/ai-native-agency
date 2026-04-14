@@ -586,11 +586,18 @@ export async function addReviewComment(
   return newComment
 }
 
+function extractDeliverableId(notes: unknown): string {
+  if (typeof notes === "string" && notes.startsWith("deliverable_id:")) {
+    return notes.slice("deliverable_id:".length)
+  }
+  return ""
+}
+
 function mapReviewRow(r: Record<string, unknown>): Review {
   const refinements = r.refinements as ReviewComment[] | null
   return {
     id: String(r.id),
-    deliverableId: "",
+    deliverableId: extractDeliverableId(r.review_notes),
     projectId: String(r.project_id),
     reviewerId: String(r.expert_id),
     reviewerName: String(r.reviewer_name ?? ""),
@@ -770,11 +777,17 @@ function mapBrandRow(r: Record<string, unknown>): BrandProfile {
 export async function getDashboardStats(tenantId?: string) {
   if (hasDb()) {
     const sql = getDb()!
-    const [projRows, revRows, costRows] = await Promise.all([
-      sql`SELECT count(*) as total, count(*) FILTER (WHERE status NOT IN ('delivered','cancelled')) as active FROM projects ${tenantId ? sql`WHERE tenant_id = ${tenantId}::uuid` : sql``}`,
-      sql`SELECT count(DISTINCT tenant_id) as clients FROM projects ${tenantId ? sql`WHERE tenant_id = ${tenantId}::uuid` : sql``}`,
-      sql`SELECT COALESCE(sum(ai_cost_cents),0) as total_ai_cost, COALESCE(sum(price_cents),0) as total_revenue FROM projects ${tenantId ? sql`WHERE tenant_id = ${tenantId}::uuid` : sql``}`,
-    ])
+    const [projRows, revRows, costRows] = tenantId
+      ? await Promise.all([
+          sql`SELECT count(*) as total, count(*) FILTER (WHERE status NOT IN ('delivered','cancelled')) as active FROM projects WHERE tenant_id = ${tenantId}::uuid`,
+          sql`SELECT count(DISTINCT tenant_id) as clients FROM projects WHERE tenant_id = ${tenantId}::uuid`,
+          sql`SELECT COALESCE(sum(ai_cost_cents),0) as total_ai_cost, COALESCE(sum(price_cents),0) as total_revenue FROM projects WHERE tenant_id = ${tenantId}::uuid`,
+        ])
+      : await Promise.all([
+          sql`SELECT count(*) as total, count(*) FILTER (WHERE status NOT IN ('delivered','cancelled')) as active FROM projects`,
+          sql`SELECT count(DISTINCT tenant_id) as clients FROM projects`,
+          sql`SELECT COALESCE(sum(ai_cost_cents),0) as total_ai_cost, COALESCE(sum(price_cents),0) as total_revenue FROM projects`,
+        ])
     const total = Number(projRows[0]?.total ?? 0)
     const active = Number(projRows[0]?.active ?? 0)
     const totalRevenue = Number(costRows[0]?.total_revenue ?? 0) / 100
@@ -810,11 +823,17 @@ export async function getBilling(tenantId?: string): Promise<{
 }> {
   if (hasDb()) {
     const sql = getDb()!
-    const [invRows, cpRows, usageRows] = await Promise.all([
-      sql`SELECT * FROM invoices ${tenantId ? sql`WHERE tenant_id = ${tenantId}::uuid` : sql``} ORDER BY created_at DESC`,
-      sql`SELECT * FROM credit_packs ORDER BY price_cents ASC`,
-      sql`SELECT * FROM usage_records ${tenantId ? sql`WHERE tenant_id = ${tenantId}::uuid` : sql``} ORDER BY month DESC`,
-    ])
+    const [invRows, cpRows, usageRows] = tenantId
+      ? await Promise.all([
+          sql`SELECT i.*, t.name as client_name FROM invoices i JOIN tenants t ON t.id = i.tenant_id WHERE i.tenant_id = ${tenantId}::uuid ORDER BY i.created_at DESC`,
+          sql`SELECT * FROM credit_packs ORDER BY price_cents ASC`,
+          sql`SELECT * FROM usage_records WHERE tenant_id = ${tenantId}::uuid ORDER BY month DESC`,
+        ])
+      : await Promise.all([
+          sql`SELECT i.*, t.name as client_name FROM invoices i JOIN tenants t ON t.id = i.tenant_id ORDER BY i.created_at DESC`,
+          sql`SELECT * FROM credit_packs ORDER BY price_cents ASC`,
+          sql`SELECT * FROM usage_records ORDER BY month DESC`,
+        ])
     return {
       invoices: invRows.map(mapInvoiceRow),
       creditPacks: cpRows.map(mapCreditPackRow),
@@ -832,7 +851,7 @@ function mapInvoiceRow(r: Record<string, unknown>): Invoice {
   return {
     id: String(r.id),
     tenantId: String(r.tenant_id),
-    clientName: "",
+    clientName: String(r.client_name ?? r.tenant_name ?? ""),
     amount: Number(r.amount_cents ?? 0) / 100,
     status: String(r.status) as Invoice["status"],
     items: Array.isArray(r.line_items) ? (r.line_items as Invoice["items"]) : [],
@@ -937,14 +956,22 @@ export async function getAIModels(): Promise<AIModel[]> {
 export async function getExpertAssignments(tenantId?: string): Promise<ExpertAssignment[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`
-      SELECT ea.*, p.title as project_title, p.project_type, u.name as expert_name
-      FROM expert_assignments ea
-      JOIN projects p ON p.id = ea.project_id
-      JOIN users u ON u.id = ea.expert_id
-      ${tenantId ? sql`WHERE ea.tenant_id = ${tenantId}::uuid` : sql``}
-      ORDER BY ea.created_at DESC
-    `
+    const rows = tenantId
+      ? await sql`
+          SELECT ea.*, p.title as project_title, p.project_type, u.name as expert_name
+          FROM expert_assignments ea
+          JOIN projects p ON p.id = ea.project_id
+          JOIN users u ON u.id = ea.expert_id
+          WHERE ea.tenant_id = ${tenantId}::uuid
+          ORDER BY ea.created_at DESC
+        `
+      : await sql`
+          SELECT ea.*, p.title as project_title, p.project_type, u.name as expert_name
+          FROM expert_assignments ea
+          JOIN projects p ON p.id = ea.project_id
+          JOIN users u ON u.id = ea.expert_id
+          ORDER BY ea.created_at DESC
+        `
     return rows.map((r) => ({
       id: String(r.id),
       projectId: String(r.project_id),
@@ -1235,7 +1262,7 @@ export async function getSla(): Promise<{ tiers: SLATier[]; compliance: SLACompl
     const sql = getDb()!
     const [tierRows, compRows] = await Promise.all([
       sql`SELECT * FROM sla_tiers ORDER BY first_draft_hours DESC`,
-      sql`SELECT * FROM sla_compliance ORDER BY created_at DESC`,
+      sql`SELECT sc.*, p.title as project_title FROM sla_compliance sc LEFT JOIN projects p ON p.id = sc.project_id ORDER BY sc.created_at DESC`,
     ])
     return {
       tiers: tierRows.map((r) => ({
@@ -1250,7 +1277,7 @@ export async function getSla(): Promise<{ tiers: SLATier[]; compliance: SLACompl
       compliance: compRows.map((r) => ({
         id: String(r.id),
         projectId: String(r.project_id),
-        projectTitle: "",
+        projectTitle: String(r.project_title ?? ""),
         clientName: String(r.client_name),
         tier: String(r.tier) as SLACompliance["tier"],
         metric: String(r.metric),

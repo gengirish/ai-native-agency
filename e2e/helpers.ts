@@ -10,29 +10,29 @@ export interface TestUser {
 }
 
 const TEST_ADMIN: TestUser = {
-  id: "u_admin",
+  id: "00000000-0000-0000-0000-000000000010",
   name: "Priya Kapoor",
   email: "admin@agencyos.demo",
   role: "admin",
-  tenantId: "t_demo",
+  tenantId: "00000000-0000-0000-0000-000000000001",
   createdAt: "2025-06-01",
 }
 
 const TEST_EXPERT: TestUser = {
-  id: "exp_maya",
+  id: "00000000-0000-0000-0000-000000000011",
   name: "Maya Okonkwo",
   email: "maya@agencyos.demo",
   role: "expert",
-  tenantId: "t_demo",
+  tenantId: "00000000-0000-0000-0000-000000000001",
   createdAt: "2025-07-15",
 }
 
 const TEST_CLIENT: TestUser = {
-  id: "u_client_lumen",
+  id: "00000000-0000-0000-0000-000000000013",
   name: "Sarah Chen",
   email: "sarah@agencyos.demo",
   role: "client",
-  tenantId: "t_demo",
+  tenantId: "00000000-0000-0000-0000-000000000001",
   createdAt: "2025-09-10",
 }
 

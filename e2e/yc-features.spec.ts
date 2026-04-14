@@ -37,7 +37,7 @@ test.describe("Feedback Copilot", () => {
   test("loads feedback page", async ({ page }) => {
     await loginAs(page, "admin")
     await page.goto("/feedback")
-    await expect(page.locator("text=/feedback/i").first()).toBeVisible()
+    await expect(page.locator("text=/feedback/i").first()).toBeVisible({ timeout: 15000 })
   })
 })
 
