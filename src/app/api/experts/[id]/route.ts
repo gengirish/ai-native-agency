@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
 import { getUserFromRequest } from "@/lib/auth/jwt"
-import { updateExpertAssignment } from "@/lib/dal"
+import { getExpertAssignments, updateExpertAssignment } from "@/lib/dal"
 
 type PatchBody = {
   status?: string
@@ -20,10 +20,23 @@ export async function PATCH(
   try {
     const user = await getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
     }
 
     const { id } = await context.params
+    const assignments = await getExpertAssignments(user.tenantId)
+    if (!assignments.some((a) => a.id === id)) {
+      return NextResponse.json(
+        { error: { message: "Assignment not found", code: "NOT_FOUND" } },
+        { status: 404 },
+      )
+    }
+
+    // updateExpertAssignment has no tenantId in WHERE; tenant enforced via getExpertAssignments above.
+
     let body: PatchBody
     try {
       body = (await request.json()) as PatchBody

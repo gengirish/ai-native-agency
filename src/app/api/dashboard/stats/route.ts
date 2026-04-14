@@ -5,7 +5,13 @@ import { getDashboardStats } from "@/lib/dal"
 export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
-    const data = await getDashboardStats(user?.tenantId)
+    if (!user) {
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
+    }
+    const data = await getDashboardStats(user.tenantId)
     return NextResponse.json({ data })
   } catch (err) {
     console.error(`[API] ${request.method} ${request.url}:`, err)

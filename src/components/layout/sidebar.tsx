@@ -123,9 +123,17 @@ export function Sidebar() {
             </p>
             <ul className="space-y-0.5">
               {group.items.map((item) => {
+                const items = group.items
                 const isActive =
                   pathname === item.href ||
-                  (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"))
+                  (item.href !== "/dashboard" &&
+                    pathname.startsWith(item.href + "/") &&
+                    !items.some(
+                      (other) =>
+                        other.href !== item.href &&
+                        other.href.length > item.href.length &&
+                        pathname.startsWith(other.href),
+                    ))
                 return (
                   <li key={item.href}>
                     <Link

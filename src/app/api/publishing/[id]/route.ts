@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
 import { getUserFromRequest } from "@/lib/auth/jwt"
-import { updatePublishingJob } from "@/lib/dal"
+import { getPublishing, updatePublishingJob } from "@/lib/dal"
 import type { PublishingStatus } from "@/types"
 
 type PatchBody = {
@@ -26,10 +26,20 @@ export async function PATCH(
   try {
     const user = await getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
     }
 
     const { id } = await context.params
+
+    const { jobs } = await getPublishing(user.tenantId)
+    if (!jobs.some((j) => j.id === id)) {
+      return NextResponse.json({ error: { message: "Job not found", code: "NOT_FOUND" } }, { status: 404 })
+    }
+    // updatePublishingJob has no tenantId in WHERE; job existence is asserted via tenant-scoped getPublishing above.
+
     let body: PatchBody
     try {
       body = (await request.json()) as PatchBody

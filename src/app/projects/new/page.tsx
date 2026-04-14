@@ -21,7 +21,7 @@ import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { ArrowLeft } from "lucide-react"
 
-const BRIEF_CREATED_FLAG = "agencyos:brief-project-created"
+const GEN_FAILED_FLAG = "agencyos:gen-failed"
 
 function parseBudgetAmount(raw: string): number | undefined {
   const cleaned = raw.replace(/[$,\s]/g, "").trim()
@@ -115,7 +115,7 @@ export default function NewBriefPage() {
       router.push(`/projects/${project.id}/generated`)
     } else {
       try {
-        sessionStorage.setItem(BRIEF_CREATED_FLAG, "1")
+        sessionStorage.setItem(GEN_FAILED_FLAG, "1")
       } catch { /* private mode */ }
       router.push("/projects")
     }

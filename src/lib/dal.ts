@@ -53,6 +53,16 @@ function rowsTo<T>(rows: Record<string, unknown>[]): T[] {
   return rows.map((r) => toCamel(r) as T)
 }
 
+/** In-memory: approximate tenant-scoped projects via assigned expert's tenant. */
+function inMemoryProjectIdsForTenant(tenantId: string): Set<string> {
+  const ids = new Set<string>()
+  for (const p of store.projects) {
+    const expert = p.expertId ? store.users.find((u) => u.id === p.expertId) : undefined
+    if (expert?.tenantId === tenantId) ids.add(p.id)
+  }
+  return ids
+}
+
 /* ------------------------------------------------------------------ */
 /*  Users                                                             */
 /* ------------------------------------------------------------------ */
@@ -218,20 +228,31 @@ export async function getProjects(tenantId?: string): Promise<Project[]> {
   return store.projects
 }
 
-export async function getProjectById(id: string): Promise<Project | null> {
+export async function getProjectById(id: string, tenantId?: string): Promise<Project | null> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`
-      SELECT p.*, t.name as client_name,
-        (SELECT count(*) FROM deliverables d WHERE d.project_id = p.id) as deliverable_count
-      FROM projects p
-      JOIN tenants t ON t.id = p.tenant_id
-      WHERE p.id = ${id}::uuid LIMIT 1
-    `
+    const rows = tenantId
+      ? await sql`
+          SELECT p.*, t.name as client_name,
+            (SELECT count(*) FROM deliverables d WHERE d.project_id = p.id) as deliverable_count
+          FROM projects p
+          JOIN tenants t ON t.id = p.tenant_id
+          WHERE p.id = ${id}::uuid AND p.tenant_id = ${tenantId}::uuid
+          LIMIT 1
+        `
+      : await sql`
+          SELECT p.*, t.name as client_name,
+            (SELECT count(*) FROM deliverables d WHERE d.project_id = p.id) as deliverable_count
+          FROM projects p
+          JOIN tenants t ON t.id = p.tenant_id
+          WHERE p.id = ${id}::uuid LIMIT 1
+        `
     if (!rows.length) return null
     return mapProjectRow(rows[0])
   }
-  return store.projects.find((p) => p.id === id) ?? null
+  const p = store.projects.find((x) => x.id === id) ?? null
+  if (!p || !tenantId) return p
+  return inMemoryProjectIdsForTenant(tenantId).has(p.id) ? p : null
 }
 
 interface CreateProjectInput {
@@ -390,17 +411,34 @@ function mapPriority(s: string): Project["priority"] {
 /*  Deliverables                                                      */
 /* ------------------------------------------------------------------ */
 
-export async function getDeliverables(projectId?: string): Promise<Deliverable[]> {
+export async function getDeliverables(projectId?: string, tenantId?: string): Promise<Deliverable[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = projectId
-      ? await sql`SELECT * FROM deliverables WHERE project_id = ${projectId}::uuid ORDER BY version DESC`
-      : await sql`SELECT * FROM deliverables ORDER BY created_at DESC`
+    const rows =
+      projectId && tenantId
+        ? await sql`
+            SELECT * FROM deliverables
+            WHERE project_id = ${projectId}::uuid AND tenant_id = ${tenantId}::uuid
+            ORDER BY version DESC
+          `
+        : projectId
+          ? await sql`SELECT * FROM deliverables WHERE project_id = ${projectId}::uuid ORDER BY version DESC`
+          : tenantId
+            ? await sql`
+                SELECT * FROM deliverables
+                WHERE tenant_id = ${tenantId}::uuid
+                ORDER BY created_at DESC
+              `
+            : await sql`SELECT * FROM deliverables ORDER BY created_at DESC`
     return rows.map(mapDeliverableRow)
   }
-  return projectId
-    ? store.deliverables.filter((d) => d.projectId === projectId)
-    : store.deliverables
+  let list = store.deliverables
+  if (projectId) list = list.filter((d) => d.projectId === projectId)
+  if (tenantId) {
+    const allowed = inMemoryProjectIdsForTenant(tenantId)
+    list = list.filter((d) => allowed.has(d.projectId))
+  }
+  return list
 }
 
 function deliverableStatusToDb(status: string): string {
@@ -507,30 +545,100 @@ function mapDeliverableRow(r: Record<string, unknown>): Deliverable {
 export async function getReviews(tenantId?: string): Promise<Review[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`
-      SELECT er.*, u.name as reviewer_name, u.role as reviewer_role
-      FROM expert_reviews er
-      JOIN users u ON u.id = er.expert_id
-      ORDER BY er.created_at DESC
-    `
+    const rows = tenantId
+      ? await sql`
+          SELECT er.*, u.name as reviewer_name, u.role as reviewer_role
+          FROM expert_reviews er
+          JOIN users u ON u.id = er.expert_id
+          JOIN projects p ON p.id = er.project_id
+          WHERE p.tenant_id = ${tenantId}::uuid
+          ORDER BY er.created_at DESC
+        `
+      : await sql`
+          SELECT er.*, u.name as reviewer_name, u.role as reviewer_role
+          FROM expert_reviews er
+          JOIN users u ON u.id = er.expert_id
+          ORDER BY er.created_at DESC
+        `
     return rows.map(mapReviewRow)
   }
-  return store.reviews
+  if (!tenantId) return store.reviews
+  const allowed = inMemoryProjectIdsForTenant(tenantId)
+  return store.reviews.filter((r) => allowed.has(r.projectId))
 }
 
-export async function getReviewById(id: string): Promise<Review | null> {
+export async function getReviewById(id: string, tenantId?: string): Promise<Review | null> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`
-      SELECT er.*, u.name as reviewer_name, u.role as reviewer_role
-      FROM expert_reviews er
-      JOIN users u ON u.id = er.expert_id
-      WHERE er.id = ${id}::uuid LIMIT 1
-    `
+    const rows = tenantId
+      ? await sql`
+          SELECT er.*, u.name as reviewer_name, u.role as reviewer_role
+          FROM expert_reviews er
+          JOIN users u ON u.id = er.expert_id
+          JOIN projects p ON p.id = er.project_id
+          WHERE er.id = ${id}::uuid AND p.tenant_id = ${tenantId}::uuid
+          LIMIT 1
+        `
+      : await sql`
+          SELECT er.*, u.name as reviewer_name, u.role as reviewer_role
+          FROM expert_reviews er
+          JOIN users u ON u.id = er.expert_id
+          WHERE er.id = ${id}::uuid LIMIT 1
+        `
     if (!rows.length) return null
     return mapReviewRow(rows[0])
   }
-  return store.reviews.find((r) => r.id === id) ?? null
+  const r = store.reviews.find((x) => x.id === id) ?? null
+  if (!r || !tenantId) return r
+  return inMemoryProjectIdsForTenant(tenantId).has(r.projectId) ? r : null
+}
+
+export async function createReview(input: {
+  projectId: string
+  deliverableId: string
+  expertId: string
+  tenantId: string
+}): Promise<Review> {
+  const notes = `deliverable_id:${input.deliverableId}`
+  if (hasDb()) {
+    const sql = getDb()!
+    const ok = await sql`
+      SELECT 1 FROM projects
+      WHERE id = ${input.projectId}::uuid AND tenant_id = ${input.tenantId}::uuid
+      LIMIT 1
+    `
+    if (!ok.length) {
+      throw new Error("createReview: project not found for tenant")
+    }
+    const rows = await sql`
+      INSERT INTO expert_reviews (project_id, expert_id, status, review_notes)
+      VALUES (${input.projectId}::uuid, ${input.expertId}::uuid, 'pending', ${notes})
+      RETURNING id
+    `
+    const id = String(rows[0].id)
+    const created = await getReviewById(id)
+    if (!created) throw new Error("createReview: failed to load inserted review")
+    return created
+  }
+  if (!inMemoryProjectIdsForTenant(input.tenantId).has(input.projectId)) {
+    throw new Error("createReview: project not found for tenant")
+  }
+  const expert = store.users.find((u) => u.id === input.expertId)
+  const review: Review = {
+    id: uid("rev"),
+    deliverableId: input.deliverableId,
+    projectId: input.projectId,
+    reviewerId: input.expertId,
+    reviewerName: expert?.name ?? "Expert",
+    reviewerRole: (expert?.role ?? "expert") as UserRole,
+    status: "pending",
+    rating: 0,
+    comments: [],
+    timeSpent: 0,
+    createdAt: new Date().toISOString(),
+  }
+  store.reviews.push(review)
+  return review
 }
 
 export async function updateReview(
@@ -772,6 +880,14 @@ function mapBrandRow(r: Record<string, unknown>): BrandProfile {
 export async function getDashboardStats(tenantId?: string) {
   if (hasDb()) {
     const sql = getDb()!
+    const FB = {
+      revenueGrowth: 0.12,
+      avgQualityScore: 8.5,
+      avgTurnaround: 4.2,
+      expertUtilization: 0.78,
+      autonomousRate: 0.41,
+      pipelineValue: 0,
+    }
     const [projRows, revRows, costRows] = tenantId
       ? await Promise.all([
           sql`SELECT count(*) as total, count(*) FILTER (WHERE status NOT IN ('delivered','cancelled')) as active FROM projects WHERE tenant_id = ${tenantId}::uuid`,
@@ -787,20 +903,145 @@ export async function getDashboardStats(tenantId?: string) {
     const active = Number(projRows[0]?.active ?? 0)
     const totalRevenue = Number(costRows[0]?.total_revenue ?? 0) / 100
     const totalAiCost = Number(costRows[0]?.total_ai_cost ?? 0) / 100
+
+    let revenueGrowth = 0
+    try {
+      const gRows = tenantId
+        ? await sql`
+            SELECT month, revenue_cents FROM revenue_metrics
+            WHERE tenant_id = ${tenantId}::uuid
+            ORDER BY month DESC LIMIT 2
+          `
+        : await sql`
+            SELECT month, SUM(revenue_cents)::bigint AS revenue_cents
+            FROM revenue_metrics
+            GROUP BY month
+            ORDER BY month DESC
+            LIMIT 2
+          `
+      if (gRows.length >= 2) {
+        const cur = Number(gRows[0].revenue_cents ?? 0)
+        const prev = Number(gRows[1].revenue_cents ?? 0)
+        revenueGrowth = prev > 0 ? (cur - prev) / prev : 0
+      }
+    } catch {
+      revenueGrowth = FB.revenueGrowth
+    }
+
+    let avgQualityScore = FB.avgQualityScore
+    try {
+      const qRows = tenantId
+        ? await sql`
+            SELECT AVG(er.quality_score) FILTER (WHERE er.quality_score IS NOT NULL AND er.quality_score > 0) AS avg_q
+            FROM expert_reviews er
+            JOIN projects p ON p.id = er.project_id
+            WHERE p.tenant_id = ${tenantId}::uuid
+          `
+        : await sql`
+            SELECT AVG(quality_score) FILTER (WHERE quality_score IS NOT NULL AND quality_score > 0) AS avg_q
+            FROM expert_reviews
+          `
+      const v = qRows[0]?.avg_q
+      if (v != null && Number(v) > 0) avgQualityScore = Number(v)
+    } catch {
+      avgQualityScore = FB.avgQualityScore
+    }
+
+    let avgTurnaround = FB.avgTurnaround
+    try {
+      const tRows = tenantId
+        ? await sql`
+            SELECT AVG(er.time_spent_mins) / 60.0 AS avg_turn
+            FROM expert_reviews er
+            JOIN projects p ON p.id = er.project_id
+            WHERE p.tenant_id = ${tenantId}::uuid AND er.completed_at IS NOT NULL
+          `
+        : await sql`
+            SELECT AVG(time_spent_mins) / 60.0 AS avg_turn
+            FROM expert_reviews
+            WHERE completed_at IS NOT NULL
+          `
+      const v = tRows[0]?.avg_turn
+      if (v != null && Number.isFinite(Number(v))) avgTurnaround = Number(v)
+    } catch {
+      avgTurnaround = FB.avgTurnaround
+    }
+
+    let expertUtilization = FB.expertUtilization
+    try {
+      const uRows = tenantId
+        ? await sql`
+            SELECT
+              (SELECT COUNT(*)::float FROM expert_assignments ea
+                WHERE ea.tenant_id = ${tenantId}::uuid
+                AND ea.status IN ('claimed','in_review')) AS active_a,
+              (SELECT COUNT(*)::float FROM users WHERE tenant_id = ${tenantId}::uuid AND role = 'expert') AS expert_n
+          `
+        : await sql`
+            SELECT
+              (SELECT COUNT(*)::float FROM expert_assignments
+                WHERE status IN ('claimed','in_review')) AS active_a,
+              (SELECT COUNT(*)::float FROM users WHERE role = 'expert') AS expert_n
+          `
+      const a = Number(uRows[0]?.active_a ?? 0)
+      const n = Number(uRows[0]?.expert_n ?? 0)
+      if (n > 0) expertUtilization = Math.min(1, a / n)
+    } catch {
+      expertUtilization = FB.expertUtilization
+    }
+
+    let autonomousRate = FB.autonomousRate
+    try {
+      const aRows = tenantId
+        ? await sql`
+            SELECT AVG(success_rate) AS ar
+            FROM autonomy_configs
+            WHERE tenant_id = ${tenantId}::uuid AND current_level = 'autonomous'
+          `
+        : await sql`
+            SELECT AVG(success_rate) AS ar
+            FROM autonomy_configs
+            WHERE current_level = 'autonomous'
+          `
+      const v = aRows[0]?.ar
+      if (v != null && Number.isFinite(Number(v))) autonomousRate = Number(v)
+    } catch {
+      autonomousRate = FB.autonomousRate
+    }
+
+    let pipelineValue = FB.pipelineValue
+    try {
+      const pRows = tenantId
+        ? await sql`
+            SELECT COALESCE(SUM(value_cents), 0)::bigint AS pipe_cents
+            FROM leads
+            WHERE tenant_id = ${tenantId}::uuid
+            AND status IN ('demo_scheduled','proposal_sent','negotiating')
+          `
+        : await sql`
+            SELECT COALESCE(SUM(value_cents), 0)::bigint AS pipe_cents
+            FROM leads
+            WHERE status IN ('demo_scheduled','proposal_sent','negotiating')
+          `
+      pipelineValue = Number(pRows[0]?.pipe_cents ?? 0) / 100
+    } catch {
+      pipelineValue = FB.pipelineValue
+    }
+
     return {
       totalRevenue,
       monthlyRevenue: totalRevenue > 0 ? Math.round(totalRevenue / Math.max(1, Math.ceil(total / 3))) : 0,
-      revenueGrowth: 0.12,
+      revenueGrowth,
       activeProjects: active,
       totalProjects: total,
       avgMargin: totalRevenue > 0 ? (totalRevenue - totalAiCost) / totalRevenue : 0,
-      avgQualityScore: 8.5,
-      avgTurnaround: 4.2,
+      avgQualityScore,
+      avgTurnaround,
       totalClients: Number(revRows[0]?.clients ?? 0),
       activeClients: Number(revRows[0]?.clients ?? 0),
-      pipelineValue: 0,
-      expertUtilization: 0.78,
-      autonomousRate: 0.41,
+      pipelineValue,
+      expertUtilization,
+      autonomousRate,
       aiCostPerProject: total > 0 ? Math.round(totalAiCost / total) : 0,
     }
   }
@@ -881,15 +1122,23 @@ function mapUsageRow(r: Record<string, unknown>): UsageRecord {
   }
 }
 
-export async function getPipelines(): Promise<Pipeline[]> {
+export async function getPipelines(tenantId?: string): Promise<Pipeline[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`
-      SELECT pr.*, p.title as project_title
-      FROM pipeline_runs pr
-      JOIN projects p ON p.id = pr.project_id
-      ORDER BY pr.created_at DESC
-    `
+    const rows = tenantId
+      ? await sql`
+          SELECT pr.*, p.title as project_title
+          FROM pipeline_runs pr
+          JOIN projects p ON p.id = pr.project_id
+          WHERE p.tenant_id = ${tenantId}::uuid
+          ORDER BY pr.created_at DESC
+        `
+      : await sql`
+          SELECT pr.*, p.title as project_title
+          FROM pipeline_runs pr
+          JOIN projects p ON p.id = pr.project_id
+          ORDER BY pr.created_at DESC
+        `
     const runIds = rows.map((r) => String(r.id))
     const allTaskRows =
       runIds.length === 0
@@ -921,7 +1170,9 @@ export async function getPipelines(): Promise<Pipeline[]> {
       }
     })
   }
-  return store.pipelines
+  if (!tenantId) return store.pipelines
+  const allowed = inMemoryProjectIdsForTenant(tenantId)
+  return store.pipelines.filter((pl) => allowed.has(pl.projectId))
 }
 
 function mapTaskRow(r: Record<string, unknown>): Pipeline["tasks"][0] {
@@ -1119,10 +1370,16 @@ export async function updatePublishingJob(
   return { ...j }
 }
 
-export async function getAutonomyConfigs(): Promise<AutonomyConfig[]> {
+export async function getAutonomyConfigs(tenantId?: string): Promise<AutonomyConfig[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`SELECT * FROM autonomy_configs ORDER BY task_type`
+    const rows = tenantId
+      ? await sql`
+          SELECT * FROM autonomy_configs
+          WHERE tenant_id = ${tenantId}::uuid
+          ORDER BY task_type
+        `
+      : await sql`SELECT * FROM autonomy_configs ORDER BY task_type`
     return rows.map((r) => ({
       id: String(r.id),
       taskType: String(r.task_type) as AutonomyConfig["taskType"],
@@ -1143,15 +1400,23 @@ export async function getAutonomyConfigs(): Promise<AutonomyConfig[]> {
   return store.autonomyConfigs
 }
 
-export async function getPerformanceMetrics(): Promise<PerformanceMetric[]> {
+export async function getPerformanceMetrics(tenantId?: string): Promise<PerformanceMetric[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`
-      SELECT pm.*, p.title as project_title
-      FROM performance_metrics pm
-      LEFT JOIN projects p ON p.id = pm.project_id
-      ORDER BY pm.measured_at DESC
-    `
+    const rows = tenantId
+      ? await sql`
+          SELECT pm.*, p.title as project_title
+          FROM performance_metrics pm
+          LEFT JOIN projects p ON p.id = pm.project_id
+          WHERE pm.tenant_id = ${tenantId}::uuid
+          ORDER BY pm.measured_at DESC
+        `
+      : await sql`
+          SELECT pm.*, p.title as project_title
+          FROM performance_metrics pm
+          LEFT JOIN projects p ON p.id = pm.project_id
+          ORDER BY pm.measured_at DESC
+        `
     return rows.map((r) => ({
       id: String(r.id),
       deliverableId: r.deliverable_id ? String(r.deliverable_id) : "",
@@ -1169,10 +1434,16 @@ export async function getPerformanceMetrics(): Promise<PerformanceMetric[]> {
   return store.performanceMetrics
 }
 
-export async function getSuggestions(): Promise<ProactiveSuggestion[]> {
+export async function getSuggestions(tenantId?: string): Promise<ProactiveSuggestion[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`SELECT * FROM suggestions ORDER BY created_at DESC`
+    const rows = tenantId
+      ? await sql`
+          SELECT * FROM suggestions
+          WHERE tenant_id = ${tenantId}::uuid
+          ORDER BY created_at DESC
+        `
+      : await sql`SELECT * FROM suggestions ORDER BY created_at DESC`
     return rows.map((r) => ({
       id: String(r.id),
       tenantId: String(r.tenant_id),
@@ -1190,13 +1461,20 @@ export async function getSuggestions(): Promise<ProactiveSuggestion[]> {
       expiresAt: r.expires_at ? new Date(r.expires_at as string).toISOString() : "",
     }))
   }
-  return store.suggestions
+  if (!tenantId) return store.suggestions
+  return store.suggestions.filter((s) => s.tenantId === tenantId)
 }
 
-export async function getFeedbackTranslations(): Promise<FeedbackTranslation[]> {
+export async function getFeedbackTranslations(tenantId?: string): Promise<FeedbackTranslation[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`SELECT * FROM feedback_translations ORDER BY created_at DESC`
+    const rows = tenantId
+      ? await sql`
+          SELECT * FROM feedback_translations
+          WHERE tenant_id = ${tenantId}::uuid
+          ORDER BY created_at DESC
+        `
+      : await sql`SELECT * FROM feedback_translations ORDER BY created_at DESC`
     return rows.map((r) => ({
       id: String(r.id),
       original: String(r.original),
@@ -1209,16 +1487,29 @@ export async function getFeedbackTranslations(): Promise<FeedbackTranslation[]> 
   return store.feedbackTranslations
 }
 
-export async function getPublishing(): Promise<{
+export async function getPublishing(tenantId?: string): Promise<{
   jobs: PublishingJob[]
   channels: ChannelConfig[]
 }> {
   if (hasDb()) {
     const sql = getDb()!
-    const [jobRows, chRows] = await Promise.all([
-      sql`SELECT * FROM publishing_jobs ORDER BY created_at DESC`,
-      sql`SELECT * FROM channel_configs ORDER BY channel`,
-    ])
+    const [jobRows, chRows] = tenantId
+      ? await Promise.all([
+          sql`
+            SELECT * FROM publishing_jobs
+            WHERE tenant_id = ${tenantId}::uuid
+            ORDER BY created_at DESC
+          `,
+          sql`
+            SELECT * FROM channel_configs
+            WHERE tenant_id = ${tenantId}::uuid
+            ORDER BY channel
+          `,
+        ])
+      : await Promise.all([
+          sql`SELECT * FROM publishing_jobs ORDER BY created_at DESC`,
+          sql`SELECT * FROM channel_configs ORDER BY channel`,
+        ])
     return {
       jobs: jobRows.map((r) => ({
         id: String(r.id),

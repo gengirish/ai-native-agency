@@ -15,11 +15,14 @@ export async function POST(
   try {
     const user = await getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
     }
 
     const { id } = await context.params
-    if (!(await getReviewById(id))) {
+    if (!(await getReviewById(id, user.tenantId))) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 })
     }
 

@@ -58,7 +58,10 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
     }
 
     let body: { text?: string }

@@ -1,7 +1,7 @@
 "use client"
 
-import { useState } from "react"
-import { useRouter } from "next/navigation"
+import { Suspense, useEffect, useState } from "react"
+import { useRouter, useSearchParams } from "next/navigation"
 import { useAuth } from "@/lib/auth/context"
 import type { UserRole } from "@/types"
 import { Zap, ArrowRight, AlertCircle, Shield, Palette, User } from "lucide-react"
@@ -44,8 +44,15 @@ const DEMO_ACCOUNTS = [
   },
 ]
 
-export default function LoginPage() {
+function safeCallbackUrl(raw: string | null): string {
+  if (!raw || !raw.startsWith("/") || raw.startsWith("//")) return "/dashboard"
+  return raw
+}
+
+function LoginPageContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const callbackUrl = safeCallbackUrl(searchParams.get("callbackUrl"))
   const { login, register, isAuthenticated } = useAuth()
   const [mode, setMode] = useState<Mode>("login")
   const [name, setName] = useState("")
@@ -56,10 +63,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [demoLoading, setDemoLoading] = useState<string | null>(null)
 
-  if (isAuthenticated) {
-    router.replace("/dashboard")
-    return null
-  }
+  useEffect(() => {
+    if (isAuthenticated) {
+      router.replace(callbackUrl)
+    }
+  }, [isAuthenticated, router, callbackUrl])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -72,7 +80,7 @@ export default function LoginPage() {
         : await register(name, email, password, role)
 
     if (result.success) {
-      router.replace("/dashboard")
+      router.replace(callbackUrl)
     } else {
       setError(result.error || "Something went wrong")
     }
@@ -84,11 +92,15 @@ export default function LoginPage() {
     setDemoLoading(account.email)
     const result = await login(account.email, account.password)
     if (result.success) {
-      router.replace("/dashboard")
+      router.replace(callbackUrl)
     } else {
       setError(result.error || "Demo login failed")
     }
     setDemoLoading(null)
+  }
+
+  if (isAuthenticated) {
+    return null
   }
 
   return (
@@ -283,5 +295,21 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+function LoginFallback() {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 px-4">
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-500/30 border-t-indigo-400" />
+    </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<LoginFallback />}>
+      <LoginPageContent />
+    </Suspense>
   )
 }

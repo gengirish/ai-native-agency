@@ -49,10 +49,20 @@ function readDataArray<T>(json: unknown): T[] {
 async function fetchDataArray<T>(path: string): Promise<T[]> {
   try {
     const res = await fetch(path, { headers: authHeaders() })
-    if (!res.ok) return []
+    if (res.status === 401) {
+      if (typeof window !== "undefined") {
+        window.location.href = "/login"
+      }
+      return []
+    }
+    if (!res.ok) {
+      console.warn(`[API] ${path} returned ${res.status}`)
+      return []
+    }
     const json: unknown = await res.json()
     return readDataArray<T>(json)
-  } catch {
+  } catch (err) {
+    console.warn(`[API] ${path} fetch failed:`, err)
     return []
   }
 }
@@ -257,6 +267,25 @@ export async function getCostBreakdown(): Promise<CostBreakdown[]> {
 
 export async function getReviews(): Promise<Review[]> {
   return fetchDataArray<Review>("/api/reviews")
+}
+
+export async function sendToReview(
+  projectId: string,
+  deliverableId: string,
+): Promise<Review | null> {
+  try {
+    const res = await fetch("/api/reviews", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", ...authHeaders() },
+      body: JSON.stringify({ projectId, deliverableId }),
+    })
+    if (!res.ok) return null
+    const json: unknown = await res.json()
+    if (!isRecord(json)) return null
+    return (json.data as Review | undefined) ?? null
+  } catch {
+    return null
+  }
 }
 
 export async function getDeliverables(): Promise<Deliverable[]> {

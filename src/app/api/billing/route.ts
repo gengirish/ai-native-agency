@@ -5,7 +5,13 @@ import { getBilling } from "@/lib/dal"
 export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
-    const { invoices, creditPacks, usage } = await getBilling(user?.tenantId)
+    if (!user) {
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
+    }
+    const { invoices, creditPacks, usage } = await getBilling(user.tenantId)
     return NextResponse.json({
       invoices,
       creditPacks,

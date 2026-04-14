@@ -12,13 +12,15 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react"
-import type { GenerationResult } from "@/lib/api"
+import { sendToReview, type GenerationResult } from "@/lib/api"
 
 export default function GeneratedPage() {
   const params = useParams()
   const router = useRouter()
   const projectId = params.id as string
   const [result, setResult] = useState<GenerationResult | null>(null)
+  const [sendingReview, setSendingReview] = useState(false)
+  const [reviewError, setReviewError] = useState<string | null>(null)
 
   useEffect(() => {
     try {
@@ -53,6 +55,18 @@ export default function GeneratedPage() {
   }
 
   const { deliverable, generation } = result
+
+  async function handleSendToReview() {
+    setReviewError(null)
+    setSendingReview(true)
+    const created = await sendToReview(projectId, deliverable.id)
+    setSendingReview(false)
+    if (created) {
+      router.push("/review")
+    } else {
+      setReviewError("Could not create the review. Please try again.")
+    }
+  }
 
   return (
     <div className="p-8">
@@ -119,19 +133,28 @@ export default function GeneratedPage() {
           </div>
         </div>
 
-        <div className="mt-6 flex gap-3">
-          <Link
-            href="/projects"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
-          >
-            Back to projects
-          </Link>
-          <Link
-            href="/reviews"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700"
-          >
-            Send to review
-          </Link>
+        <div className="mt-6 flex flex-col gap-3">
+          <div className="flex flex-wrap gap-3">
+            <Link
+              href="/projects"
+              className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm hover:bg-slate-50"
+            >
+              Back to projects
+            </Link>
+            <button
+              type="button"
+              disabled={sendingReview}
+              onClick={() => void handleSendToReview()}
+              className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-indigo-700 disabled:opacity-60"
+            >
+              {sendingReview ? "Sending…" : "Send to review"}
+            </button>
+          </div>
+          {reviewError ? (
+            <p className="text-sm text-red-600" role="alert">
+              {reviewError}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>

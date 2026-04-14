@@ -25,7 +25,8 @@ import {
 import Link from "next/link"
 import { useEffect, useMemo, useState } from "react"
 
-const BRIEF_CREATED_FLAG = "agencyos:brief-project-created"
+const BRIEF_CREATED_FLAG = "agencyos:brief-created"
+const GEN_FAILED_FLAG = "agencyos:gen-failed"
 
 type StatusTab = "all" | "active" | "completed" | "draft"
 
@@ -126,21 +127,32 @@ function ProjectCard({ project }: { project: Project }) {
   )
 }
 
+type ProjectsToast = "brief-created" | "gen-failed" | null
+
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
+  const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<StatusTab>("all")
   const [query, setQuery] = useState("")
-  const [createdToast, setCreatedToast] = useState(false)
+  const [toast, setToast] = useState<ProjectsToast>(null)
 
   useEffect(() => {
-    void getProjects().then(setProjects)
+    void getProjects().then((data) => {
+      setProjects(data)
+      setLoading(false)
+    })
   }, [])
 
   useEffect(() => {
     try {
+      if (sessionStorage.getItem(GEN_FAILED_FLAG) === "1") {
+        sessionStorage.removeItem(GEN_FAILED_FLAG)
+        setToast("gen-failed")
+        return
+      }
       if (sessionStorage.getItem(BRIEF_CREATED_FLAG) === "1") {
         sessionStorage.removeItem(BRIEF_CREATED_FLAG)
-        setCreatedToast(true)
+        setToast("brief-created")
       }
     } catch {
       /* private mode */
@@ -170,7 +182,7 @@ export default function ProjectsPage() {
   return (
     <RequireRole permission="projects:view">
       <div className="p-8">
-        {createdToast ? (
+        {toast === "brief-created" ? (
           <div
             className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 shadow-sm"
             role="status"
@@ -178,8 +190,23 @@ export default function ProjectsPage() {
             <span>Project created from your brief.</span>
             <button
               type="button"
-              onClick={() => setCreatedToast(false)}
+              onClick={() => setToast(null)}
               className="shrink-0 rounded-md px-2 py-1 font-medium text-green-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
+            >
+              Dismiss
+            </button>
+          </div>
+        ) : null}
+        {toast === "gen-failed" ? (
+          <div
+            className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm"
+            role="alert"
+          >
+            <span>Project created but AI generation failed. You can retry from the project.</span>
+            <button
+              type="button"
+              onClick={() => setToast(null)}
+              className="shrink-0 rounded-md px-2 py-1 font-medium text-amber-950 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
             >
               Dismiss
             </button>
@@ -235,7 +262,12 @@ export default function ProjectsPage() {
           </div>
         </div>
 
-        {projects.length === 0 ? (
+        {loading ? (
+          <div className="mt-10 flex flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white py-20 shadow-sm">
+            <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+            <p className="text-sm text-slate-600">Loading projects…</p>
+          </div>
+        ) : projects.length === 0 ? (
           <div className="mt-10">
             <EmptyState
               icon={FolderOpen}

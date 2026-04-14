@@ -6,7 +6,13 @@ import { createProject, getProjects } from "@/lib/dal"
 export async function GET(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
-    const projects = await getProjects(user?.tenantId)
+    if (!user) {
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
+    }
+    const projects = await getProjects(user.tenantId)
     return NextResponse.json({ data: projects })
   } catch (err) {
     console.error(`[API] ${request.method} ${request.url}:`, err)
@@ -18,7 +24,10 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
     }
 
     const body = (await request.json()) as {

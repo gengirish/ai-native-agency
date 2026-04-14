@@ -8,8 +8,15 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
+    }
     const { id } = await context.params
-    const project = await getProjectById(id)
+    const project = await getProjectById(id, user.tenantId)
     if (!project) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
@@ -27,11 +34,14 @@ export async function PATCH(
   try {
     const user = await getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
     }
 
     const { id } = await context.params
-    const existing = await getProjectById(id)
+    const existing = await getProjectById(id, user.tenantId)
     if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }

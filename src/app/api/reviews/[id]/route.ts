@@ -32,8 +32,15 @@ export async function GET(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
+    }
     const { id } = await context.params
-    const review = await getReviewById(id)
+    const review = await getReviewById(id, user.tenantId)
     if (!review) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 })
     }
@@ -51,11 +58,14 @@ export async function PATCH(
   try {
     const user = await getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
     }
 
     const { id } = await context.params
-    const reviewBefore = await getReviewById(id)
+    const reviewBefore = await getReviewById(id, user.tenantId)
     if (!reviewBefore) {
       return NextResponse.json({ error: "Review not found" }, { status: 404 })
     }

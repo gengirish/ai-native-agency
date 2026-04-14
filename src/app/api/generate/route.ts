@@ -29,7 +29,10 @@ export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+      return NextResponse.json(
+        { error: { message: "Unauthorized", code: "UNAUTHORIZED" } },
+        { status: 401 },
+      )
     }
 
     const body = (await request.json()) as {
@@ -48,9 +51,18 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const project = await getProjectById(body.projectId)
+    const project = await getProjectById(body.projectId, user.tenantId)
     if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 })
+      return NextResponse.json(
+        { error: { message: "Not found", code: "NOT_FOUND" } },
+        { status: 404 },
+      )
+    }
+    if (project.clientId !== user.tenantId) {
+      return NextResponse.json(
+        { error: { message: "Not found", code: "NOT_FOUND" } },
+        { status: 404 },
+      )
     }
 
     await updateProject(body.projectId, { status: "ai_generating" })
@@ -86,7 +98,7 @@ export async function POST(request: NextRequest) {
         tenantId: user.tenantId,
         title: `${body.title} — AI Draft`,
         type: body.type,
-        fileUrl: "",
+        fileUrl: result.content,
         aiModel: result.model,
         generationCost: result.cost,
         generationTime,
