@@ -3,7 +3,7 @@
 > **Production URL:** https://ai-native-agency.fly.dev/
 > **Repo:** https://github.com/gengirish/ai-native-agency
 > **Platform:** Fly.io (Next.js standalone)
-> **E2E Baseline:** 65/65 tests passing
+> **E2E Baseline:** 55 tests across 5 spec files
 
 ---
 
@@ -229,17 +229,19 @@ Pass criteria: p95 response time < 500ms, zero 5xx errors
 
 ## 6. Automated Test Coverage
 
-### Current State: 65 E2E tests passing
+### Current State: 55 E2E tests across 5 spec files
 
-| Suite | Tests | Coverage |
-|-------|-------|----------|
-| Route accessibility (all 17 routes) | 17 | Every page loads with visible heading |
-| Sidebar navigation | 4 | Branding, sections, link clicks, active state |
-| Home redirect | 1 | / → /dashboard |
-| Dashboard | 4 | KPIs, chart, projects table, cost breakdown |
-| Projects & Brief Builder | 4 | Project list, filters, type selection, step indicator |
-| Core features (Review, Brand, Expert, Billing, CRM) | 14 | Key UI elements and interactions |
-| YC features (all 9) | 21 | KPIs, charts, key content, interactive elements |
+| Suite | File | Tests | Coverage |
+|-------|------|-------|----------|
+| Route accessibility (all 17 routes) | `navigation.spec.ts` | 17 | Every page loads with visible heading |
+| Sidebar navigation | `navigation.spec.ts` | 4 | Branding, sections, link clicks, user info |
+| Auth redirect | `navigation.spec.ts` | 3 | Unauthenticated redirect, public landing, root → dashboard |
+| Dashboard | `dashboard.spec.ts` | 4 | Heading, KPI cards, revenue chart, projects state |
+| Projects & Brief Builder | `projects.spec.ts` | 4 | Project list, empty state, type selection, step indicator |
+| Core features (Review, Brand, Expert, Billing, CRM) | `features.spec.ts` | 7 | Key UI elements and interactions |
+| YC features (9 features) | `yc-features.spec.ts` | 9 | Page load and content for each YC feature |
+| RBAC role gating | `yc-features.spec.ts` | 4 | Client, expert, and admin access restrictions |
+| Login & registration | `yc-features.spec.ts` | 3 | Login form, registration form, account creation |
 
 ### Tests to Add After Beta
 
@@ -318,7 +320,7 @@ Day 14       Prioritize fixes and improvements into sprint backlog
 
 - [x] Frontend deployed to Fly.io: https://ai-native-agency.fly.dev/
 - [x] All 17 routes accessible and rendering
-- [x] 65/65 E2E tests passing against production
+- [x] 55 E2E tests across 5 spec files
 - [x] Git repo pushed: https://github.com/gengirish/ai-native-agency
 - [ ] Custom domain configured (optional for beta)
 - [ ] Error tracking added (Sentry or similar)

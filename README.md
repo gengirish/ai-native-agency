@@ -196,14 +196,22 @@ Never commit `.env`. Copy from `.env.example` and keep secrets local or in your 
 
 | Script | Command | Purpose |
 |--------|---------|---------|
-| Dev (watch) | `npm run dev` | Restarts Node on file changes |
-| Start | `npm run start` | Runs `src/server.js` once |
+| Dev (watch) | `npm run dev` | Turbopack dev server |
+| Dev (E2E) | `npm run dev:e2e` | Playwright-friendly dev server |
+| Build | `npm run build` | Production build |
+| Start | `npm run start` | Run production build |
+| E2E tests | `npm run test:e2e` | Run Playwright test suite |
 | Migrate | `npm run db:migrate` | Apply pending migrations |
 | Reset | `npm run db:reset -- --yes` | Drop all public tables |
 
 ## Testing
 
-Automated tests are not wired in `package.json` yet. When added, the intended command is `npm test`. Until then, rely on manual checks and migration discipline.
+- **E2E tests (Playwright):** `npm run test:e2e` — 65 tests covering all 17 routes, sidebar navigation, dashboard, brief builder, core features, and YC features. Set `BASE_URL` for deployed smoke tests. See `.cursor/skills/playwright-e2e/SKILL.md`.
+- **Unit tests:** Not yet wired in `package.json`. When added, the intended command is `npm test`.
+
+## Cursor Skills Library
+
+This project includes 148 agent skills in `.cursor/skills/`. These are playbooks covering deployment, testing, frontend, backend, security, AI, business strategy, and more. See `AGENTS.md` for the full categorized inventory. To use a skill, read its `SKILL.md` before starting work in that domain.
 
 ## Contributing
 

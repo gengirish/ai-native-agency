@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Inter } from "next/font/google"
 import "./globals.css"
+import { SessionProvider } from "@/lib/auth/session-provider"
 import { AuthProvider } from "@/lib/auth/context"
 import { AppShell } from "@/components/layout/app-shell"
 
@@ -27,9 +28,11 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
-          <AppShell>{children}</AppShell>
-        </AuthProvider>
+        <SessionProvider>
+          <AuthProvider>
+            <AppShell>{children}</AppShell>
+          </AuthProvider>
+        </SessionProvider>
       </body>
     </html>
   )

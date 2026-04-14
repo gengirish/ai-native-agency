@@ -41,6 +41,7 @@ export default function LoginPage() {
 
     if (result.success) {
       router.replace("/dashboard")
+      router.refresh()
     } else {
       setError(result.error || "Something went wrong")
     }
