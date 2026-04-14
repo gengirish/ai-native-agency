@@ -12,7 +12,7 @@ export interface TestUser {
 const TEST_ADMIN: TestUser = {
   id: "test-admin",
   name: "Test Admin",
-  email: "admin@test.com",
+  email: "admin@agencyos.dev",
   role: "admin",
   tenantId: "t-test",
   createdAt: "2026-01-01",
@@ -21,7 +21,7 @@ const TEST_ADMIN: TestUser = {
 const TEST_EXPERT: TestUser = {
   id: "test-expert",
   name: "Test Expert",
-  email: "expert@test.com",
+  email: "expert@agencyos.dev",
   role: "expert",
   tenantId: "t-test",
   createdAt: "2026-01-01",
@@ -30,7 +30,7 @@ const TEST_EXPERT: TestUser = {
 const TEST_CLIENT: TestUser = {
   id: "test-client",
   name: "Test Client",
-  email: "client@test.com",
+  email: "client@agencyos.dev",
   role: "client",
   tenantId: "t-client",
   createdAt: "2026-01-01",
@@ -38,33 +38,23 @@ const TEST_CLIENT: TestUser = {
 
 export const USERS = { admin: TEST_ADMIN, expert: TEST_EXPERT, client: TEST_CLIENT }
 
+const TEST_PASSWORD = "test1234"
+
 /**
- * Seed auth into localStorage and navigate to /dashboard.
+ * Log in via the UI form using seeded credentials.
  * After this returns the page is on /dashboard with the sidebar visible.
  */
 export async function loginAs(page: Page, role: "admin" | "expert" | "client") {
   const user = USERS[role]
 
-  // Navigate to login to get on the same origin for localStorage access
-  await page.goto("/login", { waitUntil: "commit" })
+  await page.goto("/login", { waitUntil: "domcontentloaded" })
 
-  // Inject auth data into localStorage
-  await page.evaluate(
-    ({ u, pw }) => {
-      localStorage.setItem("agencyos_auth", JSON.stringify(u))
-      const users = JSON.parse(localStorage.getItem("agencyos_users") || "[]")
-      if (!users.find((x: { email: string }) => x.email === u.email)) {
-        users.push(u)
-        localStorage.setItem("agencyos_users", JSON.stringify(users))
-      }
-      const passwords = JSON.parse(localStorage.getItem("agencyos_passwords") || "{}")
-      passwords[u.email] = pw
-      localStorage.setItem("agencyos_passwords", JSON.stringify(passwords))
-    },
-    { u: user, pw: "test1234" }
-  )
+  // Fill the login form
+  await page.locator("input[type='email']").fill(user.email)
+  await page.locator("input[type='password']").fill(TEST_PASSWORD)
+  await page.locator("button[type='submit']").click()
 
-  // Navigate to dashboard and wait for sidebar to prove auth hydrated
-  await page.goto("/dashboard", { waitUntil: "domcontentloaded" })
-  await page.waitForSelector("text=AgencyOS", { timeout: 30000 })
+  // Wait for redirect to dashboard
+  await page.waitForURL("**/dashboard", { timeout: 30000 })
+  await page.waitForSelector("h1:has-text('AgencyOS')", { timeout: 30000 })
 }

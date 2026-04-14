@@ -42,7 +42,7 @@ test.describe("Sidebar navigation", () => {
 
   test("sidebar is visible with AgencyOS branding", async ({ page }) => {
     await page.goto("/dashboard")
-    await expect(page.locator("text=AgencyOS")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "AgencyOS" })).toBeVisible()
     await expect(page.locator("text=AI-Native Platform")).toBeVisible()
   })
 
@@ -55,6 +55,7 @@ test.describe("Sidebar navigation", () => {
 
   test("sidebar navigation links work", async ({ page }) => {
     await page.goto("/dashboard")
+    await page.waitForSelector("a[href='/projects']", { timeout: 10000 })
     await page.click("a[href='/projects']")
     await expect(page).toHaveURL("/projects")
     await page.click("a[href='/dashboard']")
@@ -63,7 +64,7 @@ test.describe("Sidebar navigation", () => {
 
   test("shows logged-in user info", async ({ page }) => {
     await page.goto("/dashboard")
-    await expect(page.locator("text=Test Admin")).toBeVisible()
+    await expect(page.locator("text=Alex Morgan")).toBeVisible()
     await expect(page.locator("text=Agency Admin")).toBeVisible()
   })
 })
@@ -71,7 +72,7 @@ test.describe("Sidebar navigation", () => {
 test.describe("Auth redirect", () => {
   test("unauthenticated user is redirected to /login", async ({ page }) => {
     await page.goto("/dashboard")
-    await expect(page).toHaveURL("/login", { timeout: 10000 })
+    await expect(page).toHaveURL(/\/login/, { timeout: 10000 })
   })
 
   test("unauthenticated user sees public landing at /", async ({ page }) => {

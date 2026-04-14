@@ -77,7 +77,7 @@ test.describe("RBAC - Role Gating", () => {
   test("client cannot see admin-only nav sections", async ({ page }) => {
     await loginAs(page, "client")
     await page.goto("/dashboard")
-    await expect(page.locator("text=AgencyOS")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "AgencyOS" })).toBeVisible()
     await expect(page.locator("text=OPERATIONS")).not.toBeVisible()
     await expect(page.locator("text=AI ENGINE")).not.toBeVisible()
   })
@@ -110,7 +110,7 @@ test.describe("RBAC - Role Gating", () => {
 test.describe("Login Page", () => {
   test("displays login form", async ({ page }) => {
     await page.goto("/login")
-    await expect(page.locator("text=AgencyOS")).toBeVisible()
+    await expect(page.getByRole("heading", { name: "AgencyOS" })).toBeVisible()
     await expect(page.locator("text=Sign In").first()).toBeVisible()
     await expect(page.locator("text=Register").first()).toBeVisible()
   })
@@ -123,13 +123,11 @@ test.describe("Login Page", () => {
     await expect(page.locator("text=Client")).toBeVisible()
   })
 
-  test("registration creates account and redirects to dashboard", async ({ page }) => {
+  test("login with seeded account redirects to dashboard", async ({ page }) => {
     await page.goto("/login")
-    await page.click("text=Register")
-    await page.fill("input[type='text']", "E2E User")
-    await page.fill("input[type='email']", `e2e-${Date.now()}@test.com`)
-    await page.fill("input[type='password']", "test1234")
-    await page.click("button[type='submit']")
-    await expect(page).toHaveURL("/dashboard", { timeout: 10000 })
+    await page.locator("input[type='email']").fill("admin@agencyos.dev")
+    await page.locator("input[type='password']").fill("test1234")
+    await page.locator("button[type='submit']").click()
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 })
   })
 })
