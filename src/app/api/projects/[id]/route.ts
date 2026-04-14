@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { ProjectPriority, ProjectStatus } from "@/types"
-import { store } from "@/lib/store"
-
-function nowIso(): string {
-  return new Date().toISOString()
-}
+import { getProjectById, updateProject } from "@/lib/dal"
 
 export async function GET(
   _request: NextRequest,
@@ -12,7 +8,7 @@ export async function GET(
 ) {
   try {
     const { id } = await context.params
-    const project = store.projects.find((p) => p.id === id)
+    const project = await getProjectById(id)
     if (!project) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
@@ -28,8 +24,8 @@ export async function PATCH(
 ) {
   try {
     const { id } = await context.params
-    const project = store.projects.find((p) => p.id === id)
-    if (!project) {
+    const existing = await getProjectById(id)
+    if (!existing) {
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
 
@@ -39,10 +35,14 @@ export async function PATCH(
       expertId?: string
     }
 
-    if (body.status !== undefined) project.status = body.status
-    if (body.priority !== undefined) project.priority = body.priority
-    if (body.expertId !== undefined) project.expertId = body.expertId
-    project.updatedAt = nowIso()
+    const project = await updateProject(id, {
+      status: body.status,
+      priority: body.priority,
+      expertId: body.expertId,
+    })
+    if (!project) {
+      return NextResponse.json({ error: "Not found" }, { status: 404 })
+    }
 
     return NextResponse.json({ data: project })
   } catch {

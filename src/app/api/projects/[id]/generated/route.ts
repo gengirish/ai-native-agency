@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server"
-import { store } from "@/lib/store"
+import { getDeliverables } from "@/lib/dal"
 import { SEEDED_GENERATION_CONTENT } from "@/lib/demo-data"
 
 export async function GET(
@@ -7,7 +7,8 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   const { id } = await params
-  const deliverable = store.deliverables.find((d) => d.projectId === id)
+  const list = await getDeliverables(id)
+  const deliverable = list[0]
   if (!deliverable) {
     return NextResponse.json({ error: "Not found" }, { status: 404 })
   }

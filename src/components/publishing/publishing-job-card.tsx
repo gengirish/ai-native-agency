@@ -19,9 +19,12 @@ const nf = new Intl.NumberFormat("en-US")
 
 type Props = {
   job: PublishingJob
+  busy?: boolean
+  onPublishNow?: (job: PublishingJob) => void
+  onSchedule?: (job: PublishingJob, scheduledAtIso: string) => void
 }
 
-export function PublishingJobCard({ job }: Props) {
+export function PublishingJobCard({ job, busy, onPublishNow, onSchedule }: Props) {
   return (
     <article className="rounded-xl border border-slate-100 bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -79,13 +82,20 @@ export function PublishingJobCard({ job }: Props) {
         <div className="mt-4 flex flex-wrap gap-2 border-t border-slate-100 pt-4">
           <button
             type="button"
-            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700"
+            disabled={busy || !onPublishNow}
+            onClick={() => onPublishNow?.(job)}
+            className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition hover:bg-indigo-700 disabled:pointer-events-none disabled:opacity-50"
           >
             Publish Now
           </button>
           <button
             type="button"
-            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50"
+            disabled={busy || !onSchedule}
+            onClick={() => {
+              const when = new Date(Date.now() + 24 * 60 * 60 * 1000)
+              onSchedule?.(job, when.toISOString())
+            }}
+            className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50"
           >
             Schedule
           </button>

@@ -16,34 +16,37 @@ description: >-
 
 | Layer | Location | Role |
 |--------|-----------|------|
-| **Product UI** | `src/app`, `src/components`, `src/lib/api.ts` | Next.js 15 app; `api.ts` is the typed client boundary (demo or future `fetch`). |
-| **Backend API** (optional / parallel) | `src/server.js`, `src/routes`, `src/services`, `db/` | Express + Postgres per `ARCHITECTURE.md` and `.cursor/rules/project.mdc`. |
+| **Product UI** | `src/app`, `src/components`, `src/lib/api.ts` | Next.js 15 app; `api.ts` is the typed client boundary. |
+| **Data Access Layer** | `src/lib/dal.ts`, `src/lib/db.ts` | Dual-mode: Neon Postgres when `DATABASE_URL` is set, in-memory store fallback. |
+| **API Routes (31)** | `src/app/api/**/route.ts` | Auth, CRUD, AI generation, feedback translation, expert/publish mutations — all use DAL. |
+| **Database** | `db/migrations/`, `db/seed.js` | 25+ Postgres tables, 9 migrations, idempotent seed script. |
 
-When editing the **Next app**, follow frontend patterns and `src/lib/api.ts`. When editing **Express**, follow `project.mdc` and `api-routes.mdc`.
+When editing API routes, always import from `@/lib/dal`, never from `@/lib/store`.
 
 ## Demo vs production (integrity)
 
-- **Demo dataset:** `src/lib/demo-data.ts`. Served when `NEXT_PUBLIC_USE_DEMO_DATA` is not `false`.
-- **Honesty:** Landing and marketing must not claim live company KPIs unless backed by real data. Prefer “design targets,” “product capabilities,” or “demo workspace” language.
-- **Turning off demo:** Set `NEXT_PUBLIC_USE_DEMO_DATA=false` to exercise empty states while wiring a real backend.
+- **Dual-mode DAL:** When `DATABASE_URL` is set, all queries hit Neon Postgres. When unset, falls back to in-memory store with seeded demo data.
+- **Demo seeding:** `npm run db:seed` populates Postgres with the same demo data. Demo accounts always work.
+- **Honesty:** Landing and marketing must not claim live company KPIs unless backed by real data. Prefer "design targets," "product capabilities," or "demo workspace" language.
 
 ## Making the product *look* alive (investor demo)
 
 - Keep demo data **internally consistent** (project IDs ↔ deliverables ↔ reviews ↔ pipelines).
 - Preserve **one narrative arc** across Dashboard, Projects, CRM, AI Engine, Review Hub.
-- Avoid empty dashboards in default demo mode unless intentionally testing integration.
+- Demo data lives in both `src/lib/demo-data.ts` (in-memory fallback) and `db/seed.js` (Postgres). Keep them in sync.
 
-## API wiring path (credible milestone)
+## Database architecture
 
-1. Replace stubs in `src/lib/api.ts` with `fetch` to your API (Bearer auth, tenant header as designed).
-2. Align response shapes with `src/types`.
-3. Run Express services with real migrations (`db/migrations/`).
-4. Feature order for backend: migration → service → route → tests (see `project.mdc`).
+- **DAL pattern:** Every API route imports from `src/lib/dal.ts`. The DAL checks `hasDb()` and either queries Postgres or reads the in-memory store.
+- **Migrations:** Raw SQL in `db/migrations/`. Run with `npm run db:migrate`.
+- **Seed:** `db/seed.js` inserts all demo data idempotently. Run with `npm run db:seed`.
+- **Connection:** `src/lib/db.ts` uses `@neondatabase/serverless` for API routes (Edge-compatible). `db/connection.js` uses `pg` for CLI scripts.
 
 ## What YC still expects beyond UI
 
 - Design partners, usage, retention, revenue or clear path to it.
 - A crisp deck that matches what the product actually does—no metric without a source.
+- The pitch deck is at `YC_PITCH_DECK.md`.
 
 ## Related skills
 

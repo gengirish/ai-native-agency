@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback, useMemo } from "react"
+import { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import { RequireRole } from "@/components/auth/require-role"
 import { ExpertPerformanceSummary } from "@/components/expert/expert-performance-summary"
 import { ExpertQueueManagement } from "@/components/expert/expert-queue-management"
@@ -8,6 +8,7 @@ import { ExpertRefinementPanel } from "@/components/expert/expert-refinement-pan
 import { ExpertStatsRow } from "@/components/expert/expert-stats-row"
 import { EmptyState } from "@/components/ui/empty-state"
 import { getExpertAssignments } from "@/lib/api"
+import { getToken } from "@/lib/auth/context"
 import type { ExpertAssignment } from "@/types"
 
 function bumpQuality(before: number): number {
@@ -19,6 +20,37 @@ export default function ExpertPage() {
   const [assignments, setAssignments] = useState<ExpertAssignment[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const assignmentsRef = useRef(assignments)
+  assignmentsRef.current = assignments
+
+  const refetchAssignments = useCallback(async () => {
+    try {
+      const data = await getExpertAssignments()
+      setAssignments(data)
+    } catch {
+      setActionError("Could not refresh assignments.")
+    }
+  }, [])
+
+  const persistExpertPatch = useCallback(async (id: string, patch: Record<string, unknown>) => {
+    const token = getToken()
+    const res = await fetch(`/api/experts/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify(patch),
+    })
+    if (!res.ok) {
+      await refetchAssignments()
+      const json = (await res.json().catch(() => null)) as { error?: { message?: string } } | null
+      setActionError(json?.error?.message ?? "Could not save changes.")
+      return
+    }
+    setActionError(null)
+  }, [refetchAssignments])
 
   useEffect(() => {
     let cancelled = false
@@ -53,39 +85,56 @@ export default function ExpertPage() {
           : a
       )
     )
-  }, [])
+    void persistExpertPatch(id, { status: "in_review", claimedAt: now })
+  }, [persistExpertPatch])
 
-  const completeReview = useCallback((id: string) => {
-    const now = new Date().toISOString()
-    setAssignments((prev) =>
-      prev.map((a) => {
-        if (a.id !== id) return a
-        if (a.status !== "in_review" && a.status !== "claimed") return a
-        const start = a.claimedAt ? new Date(a.claimedAt).getTime() : Date.now()
-        const rawMins = Math.round((Date.now() - start) / 60000)
-        const minutes = rawMins > 0 ? Math.min(rawMins, 180) : 12
-        return {
-          ...a,
-          status: "completed",
-          completedAt: now,
-          reviewTimeMinutes: minutes,
-          qualityAfter: bumpQuality(a.qualityBefore),
-        }
+  const completeReview = useCallback(
+    (id: string) => {
+      const a = assignmentsRef.current.find((x) => x.id === id)
+      if (!a || (a.status !== "in_review" && a.status !== "claimed")) return
+      const now = new Date().toISOString()
+      const start = a.claimedAt ? new Date(a.claimedAt).getTime() : Date.now()
+      const rawMins = Math.round((Date.now() - start) / 60000)
+      const minutes = rawMins > 0 ? Math.min(rawMins, 180) : 12
+      const qualityAfter = bumpQuality(a.qualityBefore)
+      setAssignments((prev) =>
+        prev.map((row) => {
+          if (row.id !== id) return row
+          if (row.status !== "in_review" && row.status !== "claimed") return row
+          return {
+            ...row,
+            status: "completed",
+            completedAt: now,
+            reviewTimeMinutes: minutes,
+            qualityAfter,
+          }
+        })
+      )
+      void persistExpertPatch(id, {
+        status: "completed",
+        completedAt: now,
+        reviewTimeMinutes: minutes,
+        qualityAfter,
       })
-    )
-  }, [])
+    },
+    [persistExpertPatch],
+  )
 
-  const escalateToSenior = useCallback((id: string) => {
-    setAssignments((prev) =>
-      prev.map((a) => {
-        if (a.id !== id || a.status !== "escalated") return a
-        return {
-          ...a,
-          escalationLevel: "manual_required",
-        }
-      })
-    )
-  }, [])
+  const escalateToSenior = useCallback(
+    (id: string) => {
+      setAssignments((prev) =>
+        prev.map((a) => {
+          if (a.id !== id || a.status !== "escalated") return a
+          return {
+            ...a,
+            escalationLevel: "manual_required",
+          }
+        })
+      )
+      void persistExpertPatch(id, { escalationLevel: "manual_required" })
+    },
+    [persistExpertPatch],
+  )
 
   return (
     <RequireRole permission="expert:view">
@@ -98,6 +147,15 @@ export default function ExpertPage() {
             Claim, review, and refine AI-generated deliverables
           </p>
         </header>
+
+        {actionError ? (
+          <div
+            className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            role="alert"
+          >
+            {actionError}
+          </div>
+        ) : null}
 
         {loading ? (
           <div className="flex items-center justify-center py-24">

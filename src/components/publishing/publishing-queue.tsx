@@ -17,6 +17,9 @@ const TABS: { id: Tab; label: string }[] = [
 
 type Props = {
   jobs: PublishingJob[]
+  busyJobId?: string | null
+  onPublishNow?: (job: PublishingJob) => void
+  onScheduleJob?: (job: PublishingJob, scheduledAtIso: string) => void
 }
 
 function matchesTab(job: PublishingJob, tab: Tab): boolean {
@@ -24,7 +27,12 @@ function matchesTab(job: PublishingJob, tab: Tab): boolean {
   return job.status === tab
 }
 
-export function PublishingQueue({ jobs }: Props) {
+export function PublishingQueue({
+  jobs,
+  busyJobId,
+  onPublishNow,
+  onScheduleJob,
+}: Props) {
   const [tab, setTab] = useState<Tab>("all")
 
   const filtered = useMemo(
@@ -66,7 +74,15 @@ export function PublishingQueue({ jobs }: Props) {
             No jobs in this view.
           </p>
         ) : (
-          filtered.map((job) => <PublishingJobCard key={job.id} job={job} />)
+          filtered.map((job) => (
+            <PublishingJobCard
+              key={job.id}
+              job={job}
+              busy={busyJobId === job.id}
+              onPublishNow={onPublishNow}
+              onSchedule={onScheduleJob}
+            />
+          ))
         )}
       </div>
     </section>

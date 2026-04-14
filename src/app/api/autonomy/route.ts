@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
-import { store } from "@/lib/store"
+import { getAutonomyConfigs } from "@/lib/dal"
 
 export async function GET(_request: NextRequest) {
-  return NextResponse.json({ data: store.autonomyConfigs })
+  const data = await getAutonomyConfigs()
+  return NextResponse.json({ data })
 }

@@ -1,14 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import type { Lead } from "@/types"
-import { store, uid } from "@/lib/store"
-
-function nowIso(): string {
-  return new Date().toISOString()
-}
+import { getUserFromRequest } from "@/lib/auth/jwt"
+import { createLead, getLeads } from "@/lib/dal"
+import { hasDb } from "@/lib/db"
 
 export async function GET(_request: NextRequest) {
   try {
-    return NextResponse.json({ data: store.leads })
+    const leads = await getLeads()
+    return NextResponse.json({ data: leads })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
@@ -16,6 +14,11 @@ export async function GET(_request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getUserFromRequest(request)
+    if (hasDb() && !user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = (await request.json()) as {
       company?: string
       contactName?: string
@@ -25,21 +28,16 @@ export async function POST(request: NextRequest) {
       notes?: string
     }
 
-    const ts = nowIso()
-    const lead: Lead = {
-      id: uid("lead"),
+    const lead = await createLead({
+      tenantId: user?.tenantId ?? "t_demo",
       company: body.company ?? "",
       contactName: body.contactName ?? "",
       email: body.email ?? "",
-      status: "new",
-      value: typeof body.value === "number" ? body.value : 0,
-      source: body.source ?? "",
-      notes: body.notes ?? "",
-      createdAt: ts,
-      lastContactAt: ts,
-    }
+      value: body.value,
+      source: body.source,
+      notes: body.notes,
+    })
 
-    store.leads.push(lead)
     return NextResponse.json({ data: lead }, { status: 201 })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

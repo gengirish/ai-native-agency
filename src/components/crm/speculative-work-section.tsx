@@ -8,6 +8,9 @@ type SpeculativeWorkSectionProps = {
   onWebsiteUrlChange: (value: string) => void
   onGenerate: () => void
   leadsWithSpec: Lead[]
+  selectedLeadLabel?: string | null
+  generating?: boolean
+  errorMessage?: string | null
 }
 
 export function SpeculativeWorkSection({
@@ -15,6 +18,9 @@ export function SpeculativeWorkSection({
   onWebsiteUrlChange,
   onGenerate,
   leadsWithSpec,
+  selectedLeadLabel,
+  generating = false,
+  errorMessage,
 }: SpeculativeWorkSectionProps) {
   return (
     <section className="space-y-6">
@@ -56,11 +62,26 @@ export function SpeculativeWorkSection({
           <button
             type="button"
             onClick={onGenerate}
-            className="shrink-0 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700"
+            disabled={generating}
+            className="shrink-0 rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 disabled:pointer-events-none disabled:opacity-60"
           >
-            Generate Sample Work
+            {generating ? "Generating…" : "Generate Sample Work"}
           </button>
         </div>
+        {selectedLeadLabel ? (
+          <p className="mt-3 text-xs text-slate-600">
+            Target lead: <span className="font-medium text-slate-800">{selectedLeadLabel}</span>
+          </p>
+        ) : (
+          <p className="mt-3 text-xs text-amber-800">
+            Select a lead on the pipeline board to attach speculative work.
+          </p>
+        )}
+        {errorMessage ? (
+          <p className="mt-2 text-sm text-red-600" role="alert">
+            {errorMessage}
+          </p>
+        ) : null}
       </div>
 
       {leadsWithSpec.length > 0 ? (

@@ -118,15 +118,15 @@ test.describe("Login Page", () => {
   test("shows registration form with role selection", async ({ page }) => {
     await page.goto("/login")
     await page.click("text=Register")
-    await expect(page.locator("text=Agency Admin")).toBeVisible()
-    await expect(page.locator("text=Expert Reviewer")).toBeVisible()
-    await expect(page.locator("text=Client")).toBeVisible()
+    await expect(page.locator("form").getByText("Agency Admin")).toBeVisible()
+    await expect(page.locator("form").getByText("Expert Reviewer")).toBeVisible()
+    await expect(page.locator("form").getByText("Client")).toBeVisible()
   })
 
   test("login with seeded account redirects to dashboard", async ({ page }) => {
     await page.goto("/login")
-    await page.locator("input[type='email']").fill("admin@agencyos.dev")
-    await page.locator("input[type='password']").fill("test1234")
+    await page.locator("input[type='email']").fill("admin@agencyos.demo")
+    await page.locator("input[type='password']").fill("demo123")
     await page.locator("button[type='submit']").click()
     await expect(page).toHaveURL(/\/dashboard/, { timeout: 15000 })
   })

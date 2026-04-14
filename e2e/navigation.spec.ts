@@ -64,7 +64,7 @@ test.describe("Sidebar navigation", () => {
 
   test("shows logged-in user info", async ({ page }) => {
     await page.goto("/dashboard")
-    await expect(page.locator("text=Alex Morgan")).toBeVisible()
+    await expect(page.locator("text=Priya Kapoor")).toBeVisible()
     await expect(page.locator("text=Agency Admin")).toBeVisible()
   })
 })

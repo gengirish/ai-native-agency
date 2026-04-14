@@ -793,6 +793,13 @@ export const demoPublishingJobs: PublishingJob[] = [
     status: "scheduled",
     scheduledAt: iso("2026-04-12T14:00:00"),
   },
+  {
+    id: "pub_draft_north",
+    deliverableId: "del_north_1",
+    projectTitle: "Northwind — carousel B",
+    channel: "google_ads",
+    status: "draft",
+  },
 ]
 
 export const demoChannelConfigs: ChannelConfig[] = [

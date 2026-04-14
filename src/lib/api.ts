@@ -1,3 +1,4 @@
+import { getToken } from "@/lib/auth/context"
 import type {
   Project,
   ProjectPriority,
@@ -6,6 +7,7 @@ import type {
   Invoice,
   CreditPack,
   Lead,
+  LeadStatus,
   Pipeline,
   AIModel,
   ExpertAssignment,
@@ -24,6 +26,13 @@ import type {
   Deliverable,
   UsageRecord,
 } from "@/types"
+
+function authHeadersJson(): HeadersInit {
+  const token = typeof window !== "undefined" ? getToken() : null
+  const headers: Record<string, string> = { "Content-Type": "application/json" }
+  if (token) headers.Authorization = `Bearer ${token}`
+  return headers
+}
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value)
@@ -326,7 +335,7 @@ export interface CreateProjectInput {
   type: ProjectType
   priority?: ProjectPriority
   clientName: string
-  dueDate: string
+  dueDate?: string
   budget?: number
 }
 
@@ -344,7 +353,7 @@ export async function createProject(input: CreateProjectInput): Promise<Project 
     }
     const res = await fetch("/api/projects", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeadersJson(),
       body: JSON.stringify(body),
     })
     if (!res.ok) return null
@@ -453,7 +462,7 @@ export async function generateDeliverable(
   try {
     const res = await fetch("/api/generate", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeadersJson(),
       body: JSON.stringify(input),
     })
     if (!res.ok) return null
@@ -470,8 +479,34 @@ export async function updateLeadStatus(
   try {
     const res = await fetch(`/api/leads/${encodeURIComponent(id)}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: authHeadersJson(),
       body: JSON.stringify({ status }),
+    })
+    if (!res.ok) return null
+    const json: unknown = await res.json()
+    if (!isRecord(json) || json.data === undefined || json.data === null) {
+      return null
+    }
+    return json.data as Lead
+  } catch {
+    return null
+  }
+}
+
+export async function patchLead(
+  id: string,
+  patch: {
+    status?: LeadStatus
+    notes?: string
+    nextFollowUp?: string
+    speculativeWorkUrl?: string
+  },
+): Promise<Lead | null> {
+  try {
+    const res = await fetch(`/api/leads/${encodeURIComponent(id)}`, {
+      method: "PATCH",
+      headers: authHeadersJson(),
+      body: JSON.stringify(patch),
     })
     if (!res.ok) return null
     const json: unknown = await res.json()

@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
-import { store } from "@/lib/store"
+import { getFeedbackTranslations } from "@/lib/dal"
 
 export async function GET(_request: NextRequest) {
-  return NextResponse.json({ data: store.feedbackTranslations })
+  const data = await getFeedbackTranslations()
+  return NextResponse.json({ data })
 }

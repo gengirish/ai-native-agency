@@ -1,11 +1,12 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
-import { store } from "@/lib/store"
+import { getPublishing } from "@/lib/dal"
 
 export async function GET(_request: NextRequest) {
+  const { jobs, channels } = await getPublishing()
   return NextResponse.json({
-    jobs: store.publishingJobs,
-    channels: store.channelConfigs,
+    jobs,
+    channels,
   })
 }

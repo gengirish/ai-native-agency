@@ -1,8 +1,9 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
-import { store } from "@/lib/store"
+import { getPerformanceMetrics } from "@/lib/dal"
 
 export async function GET(_request: NextRequest) {
-  return NextResponse.json({ data: store.performanceMetrics })
+  const data = await getPerformanceMetrics()
+  return NextResponse.json({ data })
 }

@@ -8,13 +8,21 @@ import { LeadDetailPanel } from "@/components/crm/lead-detail-panel"
 import { PipelineStatsRow } from "@/components/crm/pipeline-stats"
 import { SpeculativeWorkSection } from "@/components/crm/speculative-work-section"
 import { EmptyState } from "@/components/ui/empty-state"
-import { getLeads, updateLeadStatus as apiUpdateLeadStatus } from "@/lib/api"
+import {
+  createProject,
+  generateDeliverable,
+  getLeads,
+  patchLead,
+  updateLeadStatus as apiUpdateLeadStatus,
+} from "@/lib/api"
 
 export default function CrmPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null)
   const [websiteUrl, setWebsiteUrl] = useState("")
+  const [specGenerating, setSpecGenerating] = useState(false)
+  const [specError, setSpecError] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -48,8 +56,66 @@ export default function CrmPage() {
     void apiUpdateLeadStatus(leadId, status)
   }
 
-  function handleGenerateSample() {
-    setWebsiteUrl((u) => u.trim())
+  async function handleGenerateSample() {
+    if (!selectedLead) {
+      setSpecError("Select a lead on the pipeline board first.")
+      return
+    }
+    const url = websiteUrl.trim()
+    setSpecGenerating(true)
+    setSpecError(null)
+    try {
+      const due = new Date()
+      due.setDate(due.getDate() + 14)
+      const dueStr = due.toISOString().split("T")[0] ?? ""
+      const title = `${selectedLead.company} — speculative sample`
+      const description = [
+        `Prospect: ${selectedLead.contactName} (${selectedLead.email}).`,
+        selectedLead.notes ? `Notes: ${selectedLead.notes}` : null,
+        url ? `Website: ${url}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n")
+
+      const project = await createProject({
+        title,
+        type: "brand_identity",
+        clientName: selectedLead.company,
+        dueDate: dueStr,
+        budget: selectedLead.value > 0 ? selectedLead.value : undefined,
+      })
+      if (!project) {
+        setSpecError("Could not create project. Try signing in again.")
+        return
+      }
+
+      const gen = await generateDeliverable({
+        projectId: project.id,
+        title,
+        type: "brand_identity",
+        description,
+        clientName: selectedLead.company,
+        budget: selectedLead.value > 0 ? selectedLead.value : undefined,
+      })
+      if (!gen) {
+        setSpecError("Generation failed. Open the project to retry or check API keys.")
+        return
+      }
+
+      const speculativeWorkUrl = `/projects/${project.id}/generated`
+      const updated = await patchLead(selectedLead.id, { speculativeWorkUrl })
+      if (!updated) {
+        setSpecError("Work was generated but the lead record could not be updated.")
+        return
+      }
+
+      setLeads((prev) => prev.map((l) => (l.id === updated.id ? updated : l)))
+      setWebsiteUrl((u) => u.trim())
+    } catch {
+      setSpecError("Something went wrong. Please try again.")
+    } finally {
+      setSpecGenerating(false)
+    }
   }
 
   return (
@@ -98,8 +164,13 @@ export default function CrmPage() {
             <SpeculativeWorkSection
               websiteUrl={websiteUrl}
               onWebsiteUrlChange={setWebsiteUrl}
-              onGenerate={handleGenerateSample}
+              onGenerate={() => void handleGenerateSample()}
               leadsWithSpec={leadsWithSpec}
+              selectedLeadLabel={
+                selectedLead ? `${selectedLead.company} (${selectedLead.contactName})` : null
+              }
+              generating={specGenerating}
+              errorMessage={specError}
             />
           </div>
         )}

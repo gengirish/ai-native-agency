@@ -8,6 +8,7 @@ import {
   getReviews,
   updateReview as apiUpdateReview,
 } from "@/lib/api"
+import { useAuth } from "@/lib/auth/context"
 import type { Deliverable, Project, Review, ReviewComment, UserRole } from "@/types"
 import { cn } from "@/lib/utils"
 import { RequireRole } from "@/components/auth/require-role"
@@ -24,10 +25,11 @@ const FILTER_TABS: { id: FilterTab; label: string }[] = [
   { id: "revision_requested", label: "Revision Requested" },
 ]
 
-const COMMENT_AUTHOR = "Alex Rivera"
-const COMMENT_AUTHOR_ROLE: UserRole = "admin"
-
 export function ReviewHub() {
+  const { user } = useAuth()
+  const commentAuthor = user?.name ?? "You"
+  const commentAuthorRole: UserRole = user?.role ?? "expert"
+
   const [reviews, setReviews] = useState<Review[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   const [deliverables, setDeliverables] = useState<Deliverable[]>([])
@@ -179,8 +181,8 @@ export function ReviewHub() {
                   onAppendComment={(comment) => {
                     if (selectedReview) appendComment(selectedReview.id, comment)
                   }}
-                  commentAuthor={COMMENT_AUTHOR}
-                  commentAuthorRole={COMMENT_AUTHOR_ROLE}
+                  commentAuthor={commentAuthor}
+                  commentAuthorRole={commentAuthorRole}
                 />
               </div>
             </div>

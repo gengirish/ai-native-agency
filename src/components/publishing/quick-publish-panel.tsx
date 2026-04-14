@@ -1,7 +1,7 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import type { ChannelConfig, PublishingChannel } from "@/types"
+import type { ChannelConfig, PublishingChannel, PublishingJob } from "@/types"
 import { cn } from "@/lib/utils"
 import { Rocket } from "lucide-react"
 import { CHANNEL_ICONS, CHANNEL_LABELS, channelIconWrapClass } from "./channel-styles"
@@ -14,11 +14,27 @@ type DeliverableOption = {
 type Props = {
   channelConfigs: ChannelConfig[]
   deliverableOptions: DeliverableOption[]
+  jobs: PublishingJob[]
+  patchPublishingJob: (
+    id: string,
+    body: { status: string; scheduledAt?: string },
+  ) => Promise<boolean>
+}
+
+function defaultScheduleFields() {
+  const d = new Date(Date.now() + 24 * 60 * 60 * 1000)
+  const pad = (n: number) => String(n).padStart(2, "0")
+  return {
+    date: `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`,
+    time: "14:00",
+  }
 }
 
 export function QuickPublishPanel({
   channelConfigs,
   deliverableOptions,
+  jobs,
+  patchPublishingJob,
 }: Props) {
   const connected = useMemo(
     () => channelConfigs.filter((c) => c.connected),
@@ -35,8 +51,68 @@ export function QuickPublishPanel({
       ) as Record<PublishingChannel, boolean>
   )
 
+  const defaults = useMemo(() => defaultScheduleFields(), [])
+  const [scheduleDate, setScheduleDate] = useState(defaults.date)
+  const [scheduleTime, setScheduleTime] = useState(defaults.time)
+  const [submitting, setSubmitting] = useState(false)
+  const [localError, setLocalError] = useState<string | null>(null)
+
   const toggleChannel = (ch: PublishingChannel) => {
     setChannels((prev) => ({ ...prev, [ch]: !prev[ch] }))
+  }
+
+  async function publishMatchingDrafts() {
+    setLocalError(null)
+    const targets = jobs.filter(
+      (j) =>
+        j.deliverableId === selectedDeliverable &&
+        j.status === "draft" &&
+        (channels[j.channel] ?? false),
+    )
+    if (!targets.length) {
+      setLocalError("No draft jobs for this deliverable on the selected channels.")
+      return
+    }
+    setSubmitting(true)
+    try {
+      for (const t of targets) {
+        const ok = await patchPublishingJob(t.id, { status: "live" })
+        if (!ok) return
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  async function scheduleMatchingDrafts() {
+    setLocalError(null)
+    const scheduledAtIso = new Date(`${scheduleDate}T${scheduleTime}:00`).toISOString()
+    if (Number.isNaN(new Date(scheduledAtIso).getTime())) {
+      setLocalError("Pick a valid date and time for scheduling.")
+      return
+    }
+    const targets = jobs.filter(
+      (j) =>
+        j.deliverableId === selectedDeliverable &&
+        j.status === "draft" &&
+        (channels[j.channel] ?? false),
+    )
+    if (!targets.length) {
+      setLocalError("No draft jobs for this deliverable on the selected channels.")
+      return
+    }
+    setSubmitting(true)
+    try {
+      for (const t of targets) {
+        const ok = await patchPublishingJob(t.id, {
+          status: "scheduled",
+          scheduledAt: scheduledAtIso,
+        })
+        if (!ok) return
+      }
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   return (
@@ -120,7 +196,8 @@ export function QuickPublishPanel({
               <input
                 id="pub-date"
                 type="date"
-                defaultValue="2026-04-10"
+                value={scheduleDate}
+                onChange={(e) => setScheduleDate(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
@@ -131,23 +208,34 @@ export function QuickPublishPanel({
               <input
                 id="pub-time"
                 type="time"
-                defaultValue="14:00"
+                value={scheduleTime}
+                onChange={(e) => setScheduleTime(e.target.value)}
                 className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm shadow-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
               />
             </div>
           </div>
         </div>
 
+        {localError ? (
+          <p className="mt-4 text-sm text-red-600" role="alert">
+            {localError}
+          </p>
+        ) : null}
+
         <div className="mt-6 flex flex-wrap gap-3">
           <button
             type="button"
-            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"
+            disabled={submitting || !selectedDeliverable}
+            onClick={() => void publishMatchingDrafts()}
+            className="rounded-lg bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700 disabled:pointer-events-none disabled:opacity-50"
           >
-            Publish Now
+            {submitting ? "Working…" : "Publish Now"}
           </button>
           <button
             type="button"
-            className="rounded-lg border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50"
+            disabled={submitting || !selectedDeliverable}
+            onClick={() => void scheduleMatchingDrafts()}
+            className="rounded-lg border-2 border-slate-200 bg-white px-5 py-2.5 text-sm font-semibold text-slate-800 shadow-sm transition hover:bg-slate-50 disabled:pointer-events-none disabled:opacity-50"
           >
             Schedule for Later
           </button>

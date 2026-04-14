@@ -6,13 +6,98 @@
 
 ---
 
+## Features
+
+### Core Platform (17 modules)
+
+| Module | Route | Description |
+|--------|-------|-------------|
+| **Dashboard** | `/dashboard` | Revenue ($857K total, 66% margins), active projects, pipeline value, AI autonomous rate, expert utilization |
+| **Projects** | `/projects` | Project list with filtering by status/type, brief creation wizard, AI generation results |
+| **Brief Wizard** | `/projects/new` | 5-step guided intake: project type → goals → brand DNA → audience → timeline → AI generation |
+| **Review Hub** | `/review` | Threaded feedback between clients and experts with quality scoring, version history, and status tracking |
+| **Brand DNA** | `/brand` | Color palettes, fonts, tone-of-voice, DNA scores, URL-based brand extraction |
+| **CRM & Sales** | `/crm` | Lead management ($284K pipeline), status tracking, speculative AI work generation to win deals |
+| **AI Gateway** | `/ai-engine` | Model registry, pipeline visualization, live task status, cost telemetry |
+| **Autonomy Engine** | `/autonomy` | Per-task-type confidence scoring → autonomous / spot-check / human-required |
+| **Expert Queue** | `/expert` | Assignment routing, claim/complete/escalate flows persisted via API, quality deltas |
+| **Performance** | `/performance` | CTR, ROI, spend by channel with real ad metrics |
+| **Creative Director** | `/proactive` | AI-suggested upsells based on trends and performance data |
+| **Auto-Publish** | `/publishing` | Channel integrations (Meta, Google, IG, Mailchimp) with publish/schedule flows via API |
+| **Benchmarks** | `/benchmarks` | Industry comparison — turnaround (88th percentile), satisfaction, margin (91st percentile) |
+| **SLA Management** | `/sla` | Tier-based SLAs (Starter / Professional / Enterprise) with compliance tracking |
+| **Billing** | `/billing` | Invoices, credit packs ($499–$6,999), usage records, margin analysis |
+| **Analytics** | `/analytics` | Revenue trends, cost breakdown, 6-month trajectory ($118K → $168K/mo) |
+| **Feedback Copilot** | `/feedback` | AI-powered client feedback → structured actionable items (real AI translation when keys configured) |
+
+### AI Generation (Real)
+
+- **Multi-provider gateway:** OpenRouter → Groq → Gemini with automatic failover
+- **Live generation:** Submit a brief → real AI model generates deliverable with model name, latency, token count, and cost metrics displayed
+- **Per-project-type prompts:** 9 tailored system prompts (logo, social, brand, video, legal, blog, email, ad, collateral)
+- **Cost tracking:** Per-deliverable AI cost metering and margin analysis
+- **Speculative work:** CRM leads can trigger AI generation to create sample work before contracts are signed
+
+### Authentication & RBAC
+
+- **Custom JWT auth** — no external auth dependency, Edge-compatible (Web Crypto API)
+- **3 roles:** Admin (full access, 17 modules), Expert (review queue, QA), Client (projects, billing)
+- **30+ granular permissions** with component-level gating (`<RequireRole>`)
+- **bcrypt password hashing** for real users; demo accounts use known credentials
+- **One-click demo login** on `/login` with 4 pre-seeded accounts
+
+---
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│                      Next.js 15 App                           │
+│  ┌───────────┐  ┌────────────┐  ┌──────────────────────────┐ │
+│  │  17 Pages │  │  31 API    │  │  Middleware               │ │
+│  │  (React   │  │  Routes    │  │  (JWT cookie gate)        │ │
+│  │   19 +    │  │  (auth,    │  │                           │ │
+│  │   Tailwind│  │   CRUD,    │  │  AI Gateway               │ │
+│  │   CSS +   │  │   gen,     │  │  OpenRouter → Groq →      │ │
+│  │   Recharts│  │   translate │  │  Gemini (auto failover)   │ │
+│  │          )│  │   publish) │  │                           │ │
+│  └───────────┘  └─────┬──────┘  └──────────────────────────┘ │
+│                       │                                       │
+│               ┌───────▼────────┐                              │
+│               │  Data Access   │                              │
+│               │  Layer (DAL)   │                              │
+│               └──┬──────────┬──┘                              │
+│                  │          │                                  │
+│       ┌──────────▼──┐  ┌───▼──────────────────────┐          │
+│       │ Neon Postgres│  │ In-Memory Store          │          │
+│       │ (when        │  │ (fallback when no        │          │
+│       │  DATABASE_URL│  │  DATABASE_URL — demo     │          │
+│       │  is set)     │  │  mode, resets on cold    │          │
+│       │              │  │  start)                  │          │
+│       │ 25+ tables   │  │                          │          │
+│       │ 9 migrations │  │ 4 users · 6 projects ·   │          │
+│       │ Full seed    │  │ deliverables · reviews · │          │
+│       └──────────────┘  └──────────────────────────┘          │
+└──────────────────────────────────────────────────────────────┘
+```
+
+### Key Design Decisions
+
+- **Dual-mode Data Access Layer:** `src/lib/dal.ts` abstracts all data queries. When `DATABASE_URL` is set, queries hit Neon Postgres. When unset, falls back to the in-memory store — demo mode works with zero setup.
+- **No API route touches the store directly.** All 31 routes go through the DAL.
+- **Custom JWT auth (no NextAuth):** Lightweight JWT signing/verification via Web Crypto API. Token stored in `localStorage` (API calls) + cookie (middleware gate).
+- **Multi-provider AI gateway:** `src/lib/ai/gateway.ts` routes through OpenRouter (primary), Groq (fast), Gemini (fallback) with automatic failover, cost estimation, and latency tracking.
+- **bcrypt for real users:** New registrations use `bcrypt.hashSync(password, 10)`. Demo accounts support both hashed and plaintext password comparison for backward compatibility.
+
+---
+
 ## Investor Demo Walkthrough
 
 The platform ships with pre-seeded data and one-click login for three roles. No setup required — just open the live URL.
 
 ### Step 1 — Login (one click)
 
-Visit `/login`. Three demo accounts are available with instant access:
+Visit `/login`. Four demo accounts are available:
 
 | Button | Role | Name | What they see |
 |--------|------|------|---------------|
@@ -22,178 +107,155 @@ Visit `/login`. Three demo accounts are available with instant access:
 
 ### Step 2 — Dashboard
 
-Revenue metrics ($857K total, 66% margins), active project count, pipeline value, AI autonomous rate, expert utilization — all from seeded data that tells a coherent business story.
+Revenue metrics ($857K total, 66% margins), active project count, pipeline value, AI autonomous rate, expert utilization.
 
 ### Step 3 — Projects & AI Generation
 
-- **Seeded projects:** 6 projects across logo design, social media, brand identity, ad creative, email campaigns, and marketing collateral — each at different pipeline stages.
-- **View AI Output:** Click any project with deliverables to see AI-generated content (the Apex Freight logo project has a pre-seeded 3-concept creative brief).
-- **Live AI generation:** Submit a new brief through the wizard → the platform calls a real AI model (OpenRouter → Groq → Gemini fallback chain) and shows the generated deliverable with model, latency, token count, and cost metrics.
+- **6 seeded projects** across logo design, social media, brand identity, ad creative, email campaigns, and marketing collateral
+- **View AI Output:** Click any project with deliverables to see AI-generated content
+- **Live AI generation:** Submit a new brief → real AI model generates deliverable with metrics
 
-### Step 4 — Full Platform Tour
+### Step 4 — CRM Speculative Work
 
-| Module | Route | Highlights |
-|--------|-------|------------|
-| Review Hub | `/review` | Threaded feedback between clients and experts |
-| Brand DNA | `/brand` | Color palettes, fonts, tone-of-voice, DNA scores |
-| CRM & Sales | `/crm` | 4 leads ($284K pipeline), drag-drop status |
-| AI Gateway | `/ai-engine` | Model registry, pipeline visualization, live task status |
-| Autonomy Engine | `/autonomy` | Per-task-type confidence → human-required / spot-check / autonomous |
-| Expert Queue | `/expert` | Assignment routing, escalation levels, quality deltas |
-| Performance | `/performance` | CTR, ROI, spend by channel with real ad metrics |
-| Creative Director | `/proactive` | AI-suggested upsells based on trends |
-| Auto-Publish | `/publishing` | Channel integrations (Meta, Google, IG, Mailchimp) |
-| Benchmarks | `/benchmarks` | Industry comparison — turnaround, satisfaction, margin |
-| SLA Management | `/sla` | Tier-based SLAs with compliance tracking |
-| Billing | `/billing` | Invoices, credit packs, usage records |
-| Analytics | `/analytics` | Revenue trends, cost breakdown, margin analysis |
-| Feedback Copilot | `/feedback` | Client feedback → structured actionable items |
+Navigate to `/crm` → select a lead → "Generate sample work" → AI creates a speculative deliverable tied to the lead — demonstrating how agencies win deals before contracts are signed.
 
 ### Step 5 — Role Switching
 
-Log out and one-click into a different role to demonstrate RBAC. Experts see a subset (review queue, QA). Clients see only their projects and billing.
+Log out and one-click into a different role to demonstrate RBAC. Experts see review queue and QA. Clients see only their projects and billing.
 
 ---
 
-## Quick Start (Local Development)
+## Quick Start
 
-**Prerequisites:** Node.js 18+
+### Option A — Demo mode (no database)
 
 ```bash
 git clone https://github.com/gengirish/ai-native-agency.git
 cd ai-native-agency
 npm install
-cp .env.example .env    # then add your API keys
+cp .env.example .env    # add AI keys for real generation (optional)
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000). Demo users work out of the box.
+Open [http://localhost:3000](http://localhost:3000). Demo users and seeded data work out of the box.
+
+### Option B — Real database (Neon Postgres)
+
+```bash
+git clone https://github.com/gengirish/ai-native-agency.git
+cd ai-native-agency
+npm install
+cp .env.example .env
+# Add your Neon DATABASE_URL and AI keys to .env
+
+npm run db:migrate     # Apply 9 migration files (25+ tables)
+npm run db:seed        # Seed demo data (4 users, 6 projects, full dataset)
+npm run dev
+```
+
+All data now persists in Postgres. New users register with bcrypt-hashed passwords.
 
 ### Environment Variables
 
-Create `.env` from `.env.example`:
-
 | Variable | Required | Description |
 |----------|----------|-------------|
+| `DATABASE_URL` | For real data | Neon Postgres connection string ([neon.tech](https://neon.tech)) |
 | `OPENROUTER_API_KEY` | For AI generation | Primary AI provider ([openrouter.ai](https://openrouter.ai)) |
 | `GROQ_API_KEY` | Fallback | Fast inference fallback ([console.groq.com](https://console.groq.com)) |
 | `GEMINI_API_KEY` | Fallback | Google Gemini fallback ([aistudio.google.com](https://aistudio.google.com)) |
 | `TAVILY_API_KEY` | Optional | Search-enriched generation (future) |
 | `PERPLEXITY_API_KEY` | Optional | Search-enriched generation (future) |
-| `DATABASE_URL` | Optional | PostgreSQL (for future real backend) |
-| `NEXT_PUBLIC_USE_DEMO_DATA` | Optional | `true` (default) seeds demo data; `false` for empty state |
 
-**Never commit `.env`** — it is gitignored. API keys are set on Vercel via `vercel env add`.
+**Never commit `.env`** — it is gitignored.
 
 ---
 
-## Architecture
+## Database
+
+### Schema (25+ tables across 9 migrations)
+
+| Migration | Tables |
+|-----------|--------|
+| 001 | `tenants`, `users` |
+| 002 | `brand_profiles`, `brand_assets` |
+| 003 | `projects`, `briefs` |
+| 004 | `pipeline_runs`, `pipeline_tasks` |
+| 005 | `deliverables`, `expert_reviews`, `client_feedback` |
+| 006 | `credit_balances`, `invoices`, `ai_cost_log`, `templates` |
+| 007 | `project_quality_scores` |
+| 008 | `users.password_hash` column |
+| 009 | `leads`, `ai_models`, `expert_assignments`, `autonomy_configs`, `performance_metrics`, `suggestions`, `feedback_translations`, `publishing_jobs`, `channel_configs`, `benchmarks`, `sla_tiers`, `sla_compliance`, `credit_packs`, `revenue_metrics`, `cost_breakdown`, `usage_records` |
+
+### Data Access Layer
+
+`src/lib/dal.ts` — 30+ exported functions covering every entity:
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    Next.js 15 App                    │
-│  ┌───────────┐  ┌──────────┐  ┌──────────────────┐  │
-│  │  App      │  │  API     │  │  Middleware       │  │
-│  │  Router   │  │  Routes  │  │  (JWT cookie      │  │
-│  │  (React   │  │  (28     │  │   gate)           │  │
-│  │   19 +    │  │  route   │  └──────────────────┘  │
-│  │   Tailwind│  │  handlers│                        │
-│  │   CSS)    │  │  )       │  ┌──────────────────┐  │
-│  │           │  │          │  │  AI Gateway       │  │
-│  │  17 pages │  │  CRUD +  │  │  OpenRouter →     │  │
-│  │  + brief  │  │  auth +  │  │  Groq → Gemini   │  │
-│  │  wizard   │  │  generate│  │  (auto failover)  │  │
-│  └───────────┘  └──────────┘  └──────────────────┘  │
-│                                                     │
-│  ┌──────────────────────────────────────────────┐   │
-│  │  In-Memory Store (globalThis)                 │   │
-│  │  Seeded from demo-data.ts on cold start       │   │
-│  │  4 demo users · 6 projects · deliverables ·   │   │
-│  │  reviews · leads · pipelines · brands · ...   │   │
-│  └──────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────┘
+                    ┌─────────────────┐
+  API Routes ──────►│      DAL        │
+                    │  (src/lib/dal)  │
+                    └──┬───────────┬──┘
+                       │           │
+           DATABASE_URL?        No DATABASE_URL?
+                       │           │
+               ┌───────▼──┐  ┌────▼──────────┐
+               │  Neon     │  │  In-Memory    │
+               │  Postgres │  │  Store        │
+               └──────────┘  └───────────────┘
 ```
 
-### Key Design Decisions
+### Scripts
 
-- **In-memory store over database for demos:** `src/lib/store.ts` uses `globalThis` to persist across API requests within a single serverless instance. Resets on cold start — fine for demos, replaceable with Postgres/KV for production.
-- **Custom JWT auth (no NextAuth):** Lightweight JWT signing/verification via Web Crypto API in `src/lib/auth/jwt.ts`. Token stored in `localStorage` (API calls) + cookie (middleware gate). No external auth dependency.
-- **Multi-provider AI gateway:** `src/lib/ai/gateway.ts` routes through OpenRouter (primary), Groq (fast), Gemini (fallback) with automatic failover, cost estimation, and latency tracking.
-- **Seeded demo users:** 4 users pre-loaded with IDs matching project/review/expert data for a coherent narrative.
-
----
-
-## Seeded Demo Data
-
-### Users
-
-| ID | Name | Email | Role | Password |
-|----|------|-------|------|----------|
-| `u_admin` | Priya Kapoor | admin@agencyos.demo | admin | demo123 |
-| `exp_maya` | Maya Okonkwo | maya@agencyos.demo | expert | demo123 |
-| `exp_jordan` | Jordan Lee | jordan@agencyos.demo | expert | demo123 |
-| `u_client_lumen` | Sarah Chen | sarah@agencyos.demo | client | demo123 |
-
-### Projects
-
-| ID | Title | Type | Status | Client |
-|----|-------|------|--------|--------|
-| `proj_lumen` | Lumen Analytics — full rebrand | Brand identity | Client review | Lumen Analytics |
-| `proj_pulse` | Pulse Health — Q2 social motion kit | Social media | Expert review | Pulse Health |
-| `proj_north` | Northwind — performance creative A/B | Ad creative | QA check | Northwind Commerce |
-| `proj_vertex` | Vertex Labs — investor one-pager + deck | Marketing collateral | Delivered | Vertex Labs |
-| `proj_apex` | Apex Freight — logo refinement | Logo design | QA check | Apex Freight |
-| `proj_kite` | Kite Bank — lifecycle email series | Email campaign | Draft | Kite Bank |
-
-### Additional Data
-
-- **4 deliverables** with version history and quality scores
-- **3 reviews** with threaded comments between clients and experts
-- **3 expert assignments** with escalation levels and quality deltas
-- **4 CRM leads** ($284K combined pipeline value)
-- **2 AI pipelines** (one running, one completed) with per-task cost tracking
-- **4 AI models** registered (Claude, GPT-4o, FLUX Pro, Runway Gen-3)
-- **2 brand profiles** with colors, fonts, tone of voice, DNA scores
-- **6 months of revenue data** ($118K → $168K trajectory)
-- **1 pre-seeded AI generation** (Apex Freight logo: 3 concept directions with rationale)
+| Script | Command | Purpose |
+|--------|---------|---------|
+| `npm run db:migrate` | `node db/migrate.js` | Apply pending SQL migrations |
+| `npm run db:seed` | `node db/seed.js` | Seed demo data (idempotent, transactional) |
 
 ---
 
 ## API Routes
 
-All routes are Next.js Route Handlers under `src/app/api/`.
+All routes are Next.js Route Handlers under `src/app/api/`. All use the DAL — no route accesses the store directly.
 
 ### Authentication
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/auth/register` | Register with name, email, password, role → JWT |
-| POST | `/api/auth/login` | Login with email, password → JWT |
+| POST | `/api/auth/register` | Register with name, email, password, role → bcrypt hash → JWT |
+| POST | `/api/auth/login` | Login with email, password → bcrypt verify → JWT |
 | GET | `/api/auth/me` | Get current user from Bearer token |
 
-### AI Generation
+### AI
 
 | Method | Path | Description |
 |--------|------|-------------|
-| POST | `/api/generate` | Generate deliverable from brief (real AI call) |
-| GET | `/api/projects/[id]/generated` | Get seeded/cached generation result |
+| POST | `/api/generate` | Generate deliverable from brief (real AI call via gateway) |
+| POST | `/api/feedback/translate` | AI-powered feedback translation (real AI or demo fallback) |
+| GET | `/api/projects/[id]/generated` | Get generation result for a project |
 
-### CRUD & Data
+### CRUD
 
 | Method | Path | Description |
 |--------|------|-------------|
 | GET/POST | `/api/projects` | List / create projects |
 | GET/PATCH | `/api/projects/[id]` | Get / update project |
+| GET/POST | `/api/leads` | List / create CRM leads |
+| PATCH | `/api/leads/[id]` | Update lead status, notes, speculative work URL |
 | GET | `/api/reviews` | List reviews |
-| GET/PATCH | `/api/reviews/[id]` | Get / update review |
-| POST | `/api/reviews/[id]/comments` | Add comment to review |
-| GET | `/api/leads` | List CRM leads |
-| PATCH | `/api/leads/[id]` | Update lead status |
+| GET/PATCH | `/api/reviews/[id]` | Get / update review status and rating |
+| POST | `/api/reviews/[id]/comments` | Add comment to review (uses authenticated user) |
+| PATCH | `/api/experts/[id]` | Update expert assignment (claim, complete, escalate) |
+| PATCH | `/api/publishing/[id]` | Update publishing job status (publish, schedule) |
 | GET | `/api/brands` | List brand profiles |
 | GET | `/api/deliverables` | List deliverables |
-| GET | `/api/dashboard/stats` | Dashboard metrics |
-| GET | `/api/billing` | Invoices, credit packs, usage |
-| GET | `/api/pipelines` | AI pipeline runs |
+
+### Read-Only Data
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/api/dashboard/stats` | Dashboard metrics (computed from real data when DB connected) |
+| GET | `/api/billing` | Invoices, credit packs, usage records |
+| GET | `/api/pipelines` | AI pipeline runs with task details |
 | GET | `/api/experts` | Expert assignments |
 | GET | `/api/models` | AI model registry |
 | GET | `/api/autonomy` | Autonomy configurations |
@@ -211,19 +273,28 @@ All routes are Next.js Route Handlers under `src/app/api/`.
 ## Auth System
 
 ```
-Login page → POST /api/auth/login → JWT returned
-                                    ↓
-                        Stored in localStorage (API calls)
-                        + cookie "agencyos_token" (middleware)
-                                    ↓
-            Middleware checks cookie → redirect to /login if missing
-            API routes check Bearer header → 401 if invalid
+Login page → POST /api/auth/login → bcrypt verify → JWT returned
+                                                    ↓
+                                    Stored in localStorage (API calls)
+                                    + cookie "agencyos_token" (middleware)
+                                                    ↓
+                    Middleware checks cookie → redirect to /login if missing
+                    API routes check Bearer header → 401 if invalid
 ```
 
 - **RBAC:** 3 roles (admin, expert, client) with 30+ granular permissions
+- **Password security:** bcrypt hash for real users; demo accounts support plaintext fallback
 - **Route gating:** `src/middleware.ts` redirects unauthenticated requests
 - **Component gating:** `<RequireRole permission="...">` wraps protected UI
-- **Permission matrix:** `src/lib/auth/permissions.ts`
+
+### Seeded Demo Users
+
+| Email | Password | Role | Name |
+|-------|----------|------|------|
+| admin@agencyos.demo | demo123 | admin | Priya Kapoor |
+| maya@agencyos.demo | demo123 | expert | Maya Okonkwo |
+| jordan@agencyos.demo | demo123 | expert | Jordan Lee |
+| sarah@agencyos.demo | demo123 | client | Sarah Chen |
 
 ---
 
@@ -235,7 +306,12 @@ Login page → POST /api/auth/login → JWT returned
 - **Auto-failover:** If primary returns non-200, tries next provider
 - **Cost estimation:** Per-provider token rates
 - **Latency tracking:** Wall-clock ms per generation
-- **Per-project-type prompts:** 9 tailored system prompts (logo, social, brand, video, legal, blog, email, ad, collateral)
+- **Per-project-type prompts:** 9 tailored system prompts
+
+Used by:
+- `POST /api/generate` — deliverable generation from briefs
+- `POST /api/feedback/translate` — client feedback → actionable items
+- CRM speculative work — generate sample deliverables to win leads
 
 ---
 
@@ -248,6 +324,8 @@ Login page → POST /api/auth/login → JWT returned
 | `npm run build` | `next build` | Production build |
 | `npm run start` | `next start` | Run production build |
 | `npm run lint` | `next lint` | ESLint check |
+| `npm run db:migrate` | `node db/migrate.js` | Apply database migrations |
+| `npm run db:seed` | `node db/seed.js` | Seed demo data (idempotent) |
 | `npm run test:e2e` | `playwright test` | Run E2E tests |
 | `npm run test:e2e:live` | `BASE_URL=... playwright test` | E2E against deployed URL |
 | `npm run test:e2e:ui` | `playwright test --ui` | Playwright UI mode |
@@ -256,13 +334,18 @@ Login page → POST /api/auth/login → JWT returned
 
 ## Deployment
 
-Deployed on **Vercel**. See `.cursor/skills/deploy-vercel/SKILL.md`.
+Deployed on **Vercel** with Neon Postgres.
 
 ```bash
+# Set env vars
+vercel env add DATABASE_URL production
+vercel env add OPENROUTER_API_KEY production
+vercel env add GROQ_API_KEY production
+vercel env add GEMINI_API_KEY production
+
+# Deploy
 npx vercel --prod --yes --scope girish-hiremaths-projects
 ```
-
-Environment variables are set via `vercel env add <KEY> production --value "<value>"`.
 
 ---
 
@@ -273,11 +356,12 @@ Environment variables are set via `vercel env add <KEY> production --value "<val
 | Framework | Next.js 15 (App Router) |
 | UI | React 19, Tailwind CSS, Lucide icons |
 | Charts | Recharts |
-| Auth | Custom JWT (Web Crypto API) |
+| Database | Neon Postgres (serverless) with raw SQL migrations |
+| Auth | Custom JWT (Web Crypto API) + bcrypt |
 | AI | OpenRouter, Groq, Google Gemini |
-| State | In-memory store (`globalThis`) |
+| Data layer | DAL with dual-mode (Postgres / in-memory fallback) |
 | Deployment | Vercel (serverless) |
-| Testing | Playwright |
+| Testing | Playwright (55 E2E tests) |
 | Language | TypeScript 5.7 |
 
 ---
@@ -287,11 +371,14 @@ Environment variables are set via `vercel env add <KEY> production --value "<val
 ```
 src/
 ├── app/
-│   ├── api/                    28 API route handlers
+│   ├── api/                    31 API route handlers
 │   │   ├── auth/               login, register, me
 │   │   ├── generate/           AI generation endpoint
+│   │   ├── feedback/translate/  AI feedback translation
 │   │   ├── projects/           CRUD + generated results
 │   │   ├── reviews/            CRUD + comments
+│   │   ├── experts/[id]/       Expert assignment mutations
+│   │   ├── publishing/[id]/    Publishing job mutations
 │   │   └── ...                 leads, brands, billing, etc.
 │   ├── dashboard/              Main dashboard
 │   ├── projects/               Project list + brief wizard + AI results
@@ -308,11 +395,28 @@ src/
 │   ├── ai/gateway.ts           Multi-provider AI gateway
 │   ├── auth/                   JWT, permissions, context
 │   ├── api.ts                  Client-side API functions
-│   ├── demo-data.ts            Seeded demo dataset
-│   ├── store.ts                In-memory data store
+│   ├── dal.ts                  Data Access Layer (Postgres ↔ in-memory)
+│   ├── db.ts                   Neon serverless connection
+│   ├── demo-data.ts            Demo dataset (in-memory fallback)
+│   ├── store.ts                In-memory store (fallback only)
 │   └── utils.ts                Formatting helpers
-└── types/
-    └── index.ts                40+ TypeScript interfaces
+├── types/
+│   └── index.ts                40+ TypeScript interfaces
+db/
+├── connection.js               pg Pool for migration/seed scripts
+├── migrate.js                  SQL migration runner
+├── seed.js                     Full demo data seeder (idempotent)
+├── reset.js                    Drop all tables (--yes to confirm)
+└── migrations/
+    ├── 001_tenants_and_users.sql
+    ├── 002_brand_knowledge.sql
+    ├── 003_projects_and_briefs.sql
+    ├── 004_pipeline_and_tasks.sql
+    ├── 005_deliverables_and_reviews.sql
+    ├── 006_billing_and_analytics.sql
+    ├── 007_project_quality_scores.sql
+    ├── 008_users_password_hash.sql
+    └── 009_missing_tables.sql
 ```
 
 ## License

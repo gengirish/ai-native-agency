@@ -1,8 +1,8 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
-import { store, uid } from "@/lib/store"
-import type { ReviewComment, UserRole } from "@/types"
+import { addReviewComment, getReviewById } from "@/lib/dal"
+import type { UserRole } from "@/types"
 
 const roles: UserRole[] = ["admin", "expert", "client"]
 
@@ -21,8 +21,7 @@ export async function POST(
   context: { params: Promise<{ id: string }> },
 ) {
   const { id } = await context.params
-  const review = store.reviews.find((r) => r.id === id)
-  if (!review) {
+  if (!(await getReviewById(id))) {
     return NextResponse.json({ error: "Review not found" }, { status: 404 })
   }
 
@@ -45,14 +44,11 @@ export async function POST(
     )
   }
 
-  const comment: ReviewComment = {
-    id: uid("cm"),
+  const comment = await addReviewComment(id, {
     author: body.author.trim(),
     authorRole: body.authorRole,
     content: body.content,
-    createdAt: new Date().toISOString(),
-  }
+  })
 
-  review.comments.push(comment)
   return NextResponse.json(comment, { status: 201 })
 }

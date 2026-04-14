@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { generate } from "@/lib/ai/gateway"
-import { store, uid } from "@/lib/store"
-import type { Deliverable, ProjectType, ProjectStatus } from "@/types"
+import { createDeliverable, getProjectById, updateProject } from "@/lib/dal"
+import type { ProjectType } from "@/types"
 
 const TYPE_PROMPTS: Record<ProjectType, string> = {
   logo_design:
@@ -42,12 +42,12 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    const project = store.projects.find((p) => p.id === body.projectId)
+    const project = await getProjectById(body.projectId)
     if (!project) {
       return NextResponse.json({ error: "Project not found" }, { status: 404 })
     }
 
-    project.status = "ai_generating" as ProjectStatus
+    await updateProject(body.projectId, { status: "ai_generating" })
 
     const systemPrompt = TYPE_PROMPTS[body.type] ?? TYPE_PROMPTS.blog_content
 
@@ -74,28 +74,24 @@ export async function POST(request: NextRequest) {
 
     const generationTime = Date.now() - startTime
 
-    const deliverable: Deliverable = {
-      id: uid("del"),
+    const deliverable = await createDeliverable({
       projectId: body.projectId,
-      version: 1,
+      tenantId: project.clientId,
       title: `${body.title} — AI Draft`,
       type: body.type,
       fileUrl: "",
-      thumbnailUrl: "",
-      status: "qa_check",
       aiModel: result.model,
       generationCost: result.cost,
       generationTime,
       qualityScore: 0.85,
-      createdAt: new Date().toISOString(),
-    }
+      status: "qa_check",
+    })
 
-    store.deliverables.push(deliverable)
-
-    project.status = "qa_check"
-    project.deliverableCount += 1
-    project.aiCost += result.cost
-    project.updatedAt = new Date().toISOString()
+    const nextAiCost = project.aiCost + result.cost
+    await updateProject(body.projectId, {
+      status: "qa_check",
+      aiCost: nextAiCost,
+    })
 
     return NextResponse.json({
       deliverable,

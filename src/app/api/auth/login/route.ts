@@ -1,7 +1,16 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
-import { signToken, userWithoutPassword } from "@/lib/auth/jwt"
-import { store } from "@/lib/store"
+import bcrypt from "bcryptjs"
+import { signToken } from "@/lib/auth/jwt"
+import { findUserByEmail } from "@/lib/dal"
+
+function verifyPassword(plain: string, passwordHash: string | undefined): boolean {
+  if (!passwordHash) return false
+  if (passwordHash.startsWith("$2")) {
+    return bcrypt.compareSync(plain, passwordHash)
+  }
+  return plain === passwordHash
+}
 
 export async function POST(request: NextRequest) {
   let body: unknown
@@ -25,9 +34,9 @@ export async function POST(request: NextRequest) {
   }
 
   const normalizedEmail = email.trim().toLowerCase()
-  const user = store.users.find((u) => u.email.toLowerCase() === normalizedEmail)
+  const user = await findUserByEmail(normalizedEmail)
 
-  if (!user || user.password !== password) {
+  if (!user || !verifyPassword(password, user.passwordHash)) {
     return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
   }
 
@@ -38,8 +47,10 @@ export async function POST(request: NextRequest) {
     tenantId: user.tenantId,
   })
 
+  const { passwordHash: _h, ...publicUser } = user
+
   return NextResponse.json({
-    user: userWithoutPassword(user),
+    user: publicUser,
     token,
   })
 }

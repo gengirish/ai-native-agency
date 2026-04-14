@@ -8,38 +8,52 @@ import { CategoryTag, ConfidenceBadge, PriorityBadge } from "./feedback-badges"
 
 const DEFAULT_INPUT = "Make it feel more premium"
 
-const DEMO_RESULT: Omit<FeedbackTranslation, "original"> = {
-  id: "live-demo",
-  translated:
-    "Increase whitespace and vertical rhythm. Replace geometric sans headings with a refined serif. Limit palette to two primaries plus neutrals. Add subtle elevation (soft shadows) on cards and CTAs. Bump body text size slightly for a more editorial feel.",
-  confidence: 0.87,
-  category: "aesthetic",
-  actionableItems: [
-    { action: "increase", parameter: "whitespace", value: "+20–25%", priority: "high" },
-    { action: "change", parameter: "heading_font", value: "serif (e.g. Playfair)", priority: "high" },
-    { action: "reduce", parameter: "palette", value: "2 primary + neutrals", priority: "medium" },
-    { action: "add", parameter: "elevation", value: "subtle card/CTA shadow", priority: "medium" },
-    { action: "increase", parameter: "body_size", value: "+1 step scale", priority: "low" },
-  ],
-}
-
 export function LiveTranslationDemo() {
   const [input, setInput] = useState(DEFAULT_INPUT)
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState<FeedbackTranslation | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
-  const translate = useCallback(() => {
+  const translate = useCallback(async () => {
     const trimmed = input.trim()
     if (!trimmed || loading) return
     setLoading(true)
     setResult(null)
-    window.setTimeout(() => {
-      setResult({
-        ...DEMO_RESULT,
-        original: trimmed,
+    setError(null)
+    try {
+      const res = await fetch("/api/feedback/translate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: trimmed }),
       })
+      const json: unknown = await res.json().catch(() => null)
+      if (!res.ok) {
+        const msg =
+          json &&
+          typeof json === "object" &&
+          "error" in json &&
+          json.error &&
+          typeof (json as { error: { message?: string } }).error === "object"
+            ? String((json as { error: { message?: string } }).error.message ?? "Translation failed")
+            : "Translation failed"
+        setError(msg)
+        return
+      }
+      if (
+        json &&
+        typeof json === "object" &&
+        "data" in json &&
+        (json as { data: FeedbackTranslation }).data
+      ) {
+        setResult((json as { data: FeedbackTranslation }).data)
+        return
+      }
+      setError("Unexpected response from server.")
+    } catch {
+      setError("Network error. Please try again.")
+    } finally {
       setLoading(false)
-    }, 1500)
+    }
   }, [input, loading])
 
   return (
@@ -60,7 +74,7 @@ export function LiveTranslationDemo() {
 
         <button
           type="button"
-          onClick={translate}
+          onClick={() => void translate()}
           disabled={loading || !input.trim()}
           className={cn(
             "inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-500 disabled:pointer-events-none disabled:opacity-50"
@@ -74,6 +88,12 @@ export function LiveTranslationDemo() {
           {loading ? "Translating…" : "Translate"}
         </button>
       </div>
+
+      {error ? (
+        <p className="mt-4 text-sm text-red-600" role="alert">
+          {error}
+        </p>
+      ) : null}
 
       {result && (
         <div className="mt-8 space-y-4 rounded-xl border-2 border-emerald-200 bg-emerald-50/40 p-5">

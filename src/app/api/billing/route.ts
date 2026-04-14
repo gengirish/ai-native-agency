@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server"
-import { store } from "@/lib/store"
+import { getBilling } from "@/lib/dal"
 
 export async function GET(_request: NextRequest) {
   try {
+    const { invoices, creditPacks, usage } = await getBilling()
     return NextResponse.json({
-      invoices: store.invoices,
-      creditPacks: store.creditPacks,
-      usage: store.usageRecords,
+      invoices,
+      creditPacks,
+      usage,
     })
   } catch {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })

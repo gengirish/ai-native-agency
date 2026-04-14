@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server"
-import { store } from "@/lib/store"
+import { findUserById } from "@/lib/dal"
 import type { User } from "@/types"
 
 const JWT_SECRET = "agencyos-demo-secret-change-in-prod"
@@ -133,11 +133,6 @@ export async function verifyToken(token: string): Promise<JwtPayload | null> {
   return claims
 }
 
-export function userWithoutPassword(user: User & { password: string }): User {
-  const { password: _p, ...rest } = user
-  return rest
-}
-
 export async function getUserFromRequest(request: NextRequest): Promise<User | null> {
   const auth = request.headers.get("authorization")
   if (!auth?.toLowerCase().startsWith("bearer ")) return null
@@ -148,8 +143,25 @@ export async function getUserFromRequest(request: NextRequest): Promise<User | n
   const payload = await verifyToken(token)
   if (!payload) return null
 
-  const row = store.users.find((u) => u.id === payload.sub)
-  if (!row) return null
+  const dbUser = await findUserById(payload.sub)
+  if (dbUser) {
+    return {
+      id: dbUser.id,
+      name: dbUser.name,
+      email: dbUser.email,
+      role: dbUser.role,
+      tenantId: dbUser.tenantId,
+      specialty: dbUser.specialty,
+      createdAt: dbUser.createdAt,
+    }
+  }
 
-  return userWithoutPassword(row)
+  return {
+    id: payload.sub,
+    name: "",
+    email: payload.email,
+    role: payload.role as User["role"],
+    tenantId: payload.tenantId,
+    createdAt: "",
+  }
 }

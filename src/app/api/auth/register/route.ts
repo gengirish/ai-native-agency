@@ -1,13 +1,31 @@
 import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
+import bcrypt from "bcryptjs"
 import { signToken } from "@/lib/auth/jwt"
-import { store, uid } from "@/lib/store"
+import { createUser, findUserByEmail } from "@/lib/dal"
+import { getDb, hasDb } from "@/lib/db"
 import type { UserRole } from "@/types"
 
 const ROLES: UserRole[] = ["admin", "expert", "client"]
 
 function isUserRole(v: unknown): v is UserRole {
   return typeof v === "string" && (ROLES as readonly string[]).includes(v)
+}
+
+async function resolveDefaultTenantId(): Promise<string> {
+  if (!hasDb()) return "t_demo"
+  const sql = getDb()!
+  const rows = await sql`
+    INSERT INTO tenants (name, slug, plan)
+    VALUES ('Self-serve', 'self-serve-default', 'starter')
+    ON CONFLICT (slug) DO UPDATE SET updated_at = now()
+    RETURNING id
+  `
+  const id = rows[0]?.id
+  if (id === undefined) {
+    throw new Error("Failed to resolve default tenant")
+  }
+  return String(id)
 }
 
 export async function POST(request: NextRequest) {
@@ -44,28 +62,21 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const exists = store.users.some(
-    (u) => u.email.toLowerCase() === normalizedEmail,
-  )
-  if (exists) {
+  const existing = await findUserByEmail(normalizedEmail)
+  if (existing) {
     return NextResponse.json({ error: "Email already registered" }, { status: 409 })
   }
 
-  const id = uid("u")
-  const tenantId = uid("t")
-  const createdAt = new Date().toISOString()
+  const passwordHash = bcrypt.hashSync(password, 10)
+  const tenantId = await resolveDefaultTenantId()
 
-  const row = {
-    id,
+  const row = await createUser({
     name: name.trim(),
     email: normalizedEmail,
-    password,
     role,
     tenantId,
-    createdAt,
-  }
-
-  store.users.push(row)
+    passwordHash,
+  })
 
   const token = await signToken({
     sub: row.id,

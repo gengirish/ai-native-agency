@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { ConnectedChannelsRow } from "@/components/publishing/connected-channels-row"
 import { DistributionTimeline } from "@/components/publishing/distribution-timeline"
 import { PublishingHeader } from "@/components/publishing/publishing-header"
@@ -16,6 +16,48 @@ export default function PublishingPage() {
   const [jobs, setJobs] = useState<PublishingJob[]>([])
   const [channelConfigs, setChannelConfigs] = useState<ChannelConfig[]>([])
   const [loading, setLoading] = useState(true)
+  const [pubError, setPubError] = useState<string | null>(null)
+  const [busyJobId, setBusyJobId] = useState<string | null>(null)
+
+  const patchPublishingJob = useCallback(
+    async (id: string, body: { status: string; scheduledAt?: string }) => {
+      setPubError(null)
+      try {
+        const res = await fetch(`/api/publishing/${encodeURIComponent(id)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        })
+        const json = (await res.json().catch(() => null)) as
+          | { data?: PublishingJob; error?: { message?: string } }
+          | null
+        if (!res.ok) {
+          setPubError(json?.error?.message ?? "Could not update publishing job.")
+          return false
+        }
+        if (json?.data) {
+          setJobs((prev) => prev.map((j) => (j.id === id ? json.data! : j)))
+        }
+        return true
+      } catch {
+        setPubError("Network error while updating publishing.")
+        return false
+      }
+    },
+    [],
+  )
+
+  const patchCardJob = useCallback(
+    async (id: string, body: { status: string; scheduledAt?: string }) => {
+      setBusyJobId(id)
+      try {
+        return await patchPublishingJob(id, body)
+      } finally {
+        setBusyJobId(null)
+      }
+    },
+    [patchPublishingJob],
+  )
 
   useEffect(() => {
     let cancelled = false
@@ -69,11 +111,28 @@ export default function PublishingPage() {
           />
         ) : (
           <>
+            {pubError ? (
+              <div
+                className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                role="alert"
+              >
+                {pubError}
+              </div>
+            ) : null}
             <ConnectedChannelsRow configs={channelConfigs} />
-            <PublishingQueue jobs={jobs} />
+            <PublishingQueue
+              jobs={jobs}
+              busyJobId={busyJobId}
+              onPublishNow={(job) => void patchCardJob(job.id, { status: "live" })}
+              onScheduleJob={(job, scheduledAtIso) =>
+                void patchCardJob(job.id, { status: "scheduled", scheduledAt: scheduledAtIso })
+              }
+            />
             <QuickPublishPanel
               channelConfigs={channelConfigs}
               deliverableOptions={deliverableOptions}
+              jobs={jobs}
+              patchPublishingJob={patchPublishingJob}
             />
             <PublishingMetricsSummary jobs={jobs} />
             <DistributionTimeline jobs={jobs} />
