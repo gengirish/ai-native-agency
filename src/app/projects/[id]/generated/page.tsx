@@ -31,7 +31,17 @@ export default function GeneratedPage() {
         }
       }
     } catch { /* noop */ }
-    router.replace("/projects")
+
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/generated`)
+      .then(async (res) => {
+        if (res.ok) {
+          const data = (await res.json()) as GenerationResult
+          setResult(data)
+        } else {
+          router.replace("/projects")
+        }
+      })
+      .catch(() => router.replace("/projects"))
   }, [projectId, router])
 
   if (!result) {

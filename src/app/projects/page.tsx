@@ -19,6 +19,7 @@ import {
   FolderOpen,
   Plus,
   Search,
+  Sparkles,
   Star,
 } from "lucide-react"
 import Link from "next/link"
@@ -112,6 +113,15 @@ function ProjectCard({ project }: { project: Project }) {
           <dd className="mt-0.5 font-medium text-slate-800">{project.revisionCount}</dd>
         </div>
       </dl>
+      {project.deliverableCount > 0 && (
+        <Link
+          href={`/projects/${project.id}/generated`}
+          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
+        >
+          <Sparkles className="h-3.5 w-3.5" />
+          View AI Output
+        </Link>
+      )}
     </article>
   )
 }

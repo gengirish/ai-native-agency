@@ -1,29 +1,33 @@
-import NextAuth from "next-auth"
-import { authConfig } from "./auth.config"
 import { NextResponse } from "next/server"
+import type { NextRequest } from "next/server"
 
-const { auth } = NextAuth(authConfig)
+const PUBLIC_PATHS = ["/", "/login", "/api/auth", "/api/generate"]
+const PUBLIC_PREFIXES = ["/api/"]
 
-const PUBLIC_PATHS = ["/", "/login", "/api/auth"]
+export function middleware(request: NextRequest) {
+  const { pathname } = request.nextUrl
 
-export default auth((req) => {
-  const { pathname } = req.nextUrl
+  if (PUBLIC_PATHS.some((p) => (p === "/" ? pathname === "/" : pathname.startsWith(p)))) {
+    return NextResponse.next()
+  }
 
-  const isPublic = PUBLIC_PATHS.some((p) =>
-    p === "/" ? pathname === "/" : pathname.startsWith(p)
-  )
+  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
+    return NextResponse.next()
+  }
 
-  if (isPublic) return NextResponse.next()
+  const token = request.cookies.get("agencyos_token")?.value
 
-  if (!req.auth) {
-    const loginUrl = new URL("/login", req.nextUrl.origin)
+  if (!token) {
+    const loginUrl = new URL("/login", request.nextUrl.origin)
     loginUrl.searchParams.set("callbackUrl", pathname)
     return NextResponse.redirect(loginUrl)
   }
 
   return NextResponse.next()
-})
+}
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp|ico)$).*)",
+  ],
 }

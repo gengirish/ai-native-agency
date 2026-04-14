@@ -1,7 +1,13 @@
 "use client"
 
-import { createContext, useContext, useCallback, type ReactNode } from "react"
-import { useSession, signIn, signOut } from "next-auth/react"
+import {
+  createContext,
+  useContext,
+  useCallback,
+  useEffect,
+  useState,
+  type ReactNode,
+} from "react"
 import type { User, UserRole } from "@/types"
 import { hasPermission, type Permission } from "./permissions"
 
@@ -20,64 +26,108 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null)
 
+function setTokenCookie(token: string) {
+  document.cookie = `agencyos_token=${token};path=/;max-age=${60 * 60 * 24};SameSite=Lax`
+}
+
+function clearTokenCookie() {
+  document.cookie = "agencyos_token=;path=/;max-age=0"
+}
+
+export function getToken(): string | null {
+  if (typeof window === "undefined") return null
+  return localStorage.getItem("agencyos_token")
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const { data: session, status } = useSession()
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
 
-  const isLoading = status === "loading"
-  const isAuthenticated = status === "authenticated" && !!session?.user
+  const isAuthenticated = !!user
 
-  const user: User | null = isAuthenticated
-    ? {
-        id: session.user.id,
-        name: session.user.name ?? "",
-        email: session.user.email ?? "",
-        role: session.user.role ?? "admin",
-        tenantId: session.user.tenantId ?? "",
-        createdAt: new Date().toISOString(),
-      }
-    : null
+  useEffect(() => {
+    const token = localStorage.getItem("agencyos_token")
+    if (!token) {
+      setIsLoading(false)
+      return
+    }
+    fetch("/api/auth/me", {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const json = (await res.json()) as { user?: User }
+          if (json.user) {
+            setUser(json.user)
+            return
+          }
+        }
+        localStorage.removeItem("agencyos_token")
+        clearTokenCookie()
+      })
+      .catch(() => {
+        localStorage.removeItem("agencyos_token")
+        clearTokenCookie()
+      })
+      .finally(() => setIsLoading(false))
+  }, [])
 
   const login = useCallback(async (email: string, password: string) => {
     if (!email || !password) {
       return { success: false, error: "Email and password are required" }
     }
-
-    const result = await signIn("credentials", {
-      email,
-      password,
-      redirect: false,
-    })
-
-    if (result?.error) {
-      return { success: false, error: "Invalid email or password" }
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { error?: string }
+        return { success: false, error: err.error ?? "Invalid email or password" }
+      }
+      const data = (await res.json()) as { user: User; token: string }
+      localStorage.setItem("agencyos_token", data.token)
+      setTokenCookie(data.token)
+      setUser(data.user)
+      return { success: true }
+    } catch {
+      return { success: false, error: "Network error" }
     }
-
-    return { success: true }
   }, [])
 
-  const register = useCallback(async (name: string, email: string, password: string, role: UserRole) => {
-    if (!name || !email || !password) {
-      return { success: false, error: "All fields are required" }
-    }
-
-    const result = await signIn("credentials", {
-      email,
-      password,
-      name,
-      role,
-      action: "register",
-      redirect: false,
-    })
-
-    if (result?.error) {
-      return { success: false, error: "An account with this email already exists" }
-    }
-
-    return { success: true }
-  }, [])
+  const register = useCallback(
+    async (name: string, email: string, password: string, role: UserRole) => {
+      if (!name || !email || !password) {
+        return { success: false, error: "All fields are required" }
+      }
+      try {
+        const res = await fetch("/api/auth/register", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name, email, password, role }),
+        })
+        if (!res.ok) {
+          const err = (await res.json().catch(() => ({}))) as { error?: string }
+          return { success: false, error: err.error ?? "Registration failed" }
+        }
+        const data = (await res.json()) as { user: User; token: string }
+        localStorage.setItem("agencyos_token", data.token)
+        setTokenCookie(data.token)
+        setUser(data.user)
+        return { success: true }
+      } catch {
+        return { success: false, error: "Network error" }
+      }
+    },
+    [],
+  )
 
   const logout = useCallback(() => {
-    signOut({ callbackUrl: "/login" })
+    localStorage.removeItem("agencyos_token")
+    clearTokenCookie()
+    setUser(null)
+    window.location.href = "/login"
   }, [])
 
   const can = useCallback(
@@ -85,11 +135,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (!user) return false
       return hasPermission(user.role, permission)
     },
-    [user]
+    [user],
   )
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated, isLoading, login, register, logout, can }}>
+    <AuthContext.Provider
+      value={{ user, isAuthenticated, isLoading, login, register, logout, can }}
+    >
       {children}
     </AuthContext.Provider>
   )

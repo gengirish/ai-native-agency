@@ -117,7 +117,7 @@ export const demoProjects: Project[] = [
     id: "proj_apex",
     title: "Apex Freight — logo refinement",
     type: "logo_design",
-    status: "ai_generating",
+    status: "qa_check",
     priority: "medium",
     clientId: "c_apex",
     clientName: "Apex Freight",
@@ -129,8 +129,8 @@ export const demoProjects: Project[] = [
     qualityScore: 7.8,
     dueDate: iso("2026-04-30"),
     createdAt: iso("2026-04-08"),
-    updatedAt: iso("2026-04-11"),
-    deliverableCount: 2,
+    updatedAt: iso("2026-04-12"),
+    deliverableCount: 3,
     revisionCount: 0,
   },
   {
@@ -216,7 +216,76 @@ export const demoDeliverables: Deliverable[] = [
     qualityScore: 9.1,
     createdAt: iso("2026-04-03"),
   },
+  {
+    id: "del_apex_1",
+    projectId: "proj_apex",
+    version: 1,
+    title: "Apex Freight — logo refinement — AI Draft",
+    type: "logo_design",
+    fileUrl: "",
+    thumbnailUrl: "",
+    status: "qa_check",
+    aiModel: "anthropic/claude-sonnet-4",
+    generationCost: 0.0084,
+    generationTime: 6420,
+    qualityScore: 0.85,
+    createdAt: iso("2026-04-12"),
+  },
 ]
+
+export const SEEDED_GENERATION_CONTENT = `# Apex Freight — Logo Refinement
+
+## Creative Brief Breakdown
+
+**Objective:** Refine and modernize the Apex Freight logo to convey reliability, speed, and scale while maintaining brand recognition among existing B2B clients.
+
+**Target Audience:** Logistics managers, supply-chain VPs, and procurement leads at mid-market and enterprise companies shipping 500+ pallets/month.
+
+**Constraints:** Must work at 16px favicon, embroidered on driver uniforms, and on 53-foot trailer wraps.
+
+---
+
+## Concept Direction A — "The Apex Arrow"
+
+**Rationale:** The word "Apex" already implies a peak or summit. This concept distills that into a single upward-pointing chevron that doubles as a stylized "A." The negative space inside the chevron forms a road vanishing toward the horizon.
+
+- **Primary mark:** Geometric chevron, 30-degree angle, sharp corners
+- **Color:** Deep navy (#0B1D3A) with an accent slash in signal orange (#FF6B2C)
+- **Typography:** Custom-modified Geist Sans bold — the "x" in FREIGHT is kerned tighter to create visual momentum
+- **Scalability:** Chevron alone works as app icon; full lockup for headers
+
+## Concept Direction B — "Moving Horizon"
+
+**Rationale:** Freight is about movement over distance. This concept uses three stacked horizontal bars that taper from left to right, suggesting velocity and forward progress. The top bar is slightly lifted, creating the "apex" peak.
+
+- **Primary mark:** Three tapering bars in a stacked formation
+- **Color:** Charcoal (#1C1C1E) primary with electric blue (#2563EB) accent on the apex bar
+- **Typography:** Inter Display semi-bold, all-caps tracking +4%
+- **Personality:** Precision engineering meets logistics tech
+
+## Concept Direction C — "Shield & Route"
+
+**Rationale:** Trust is the #1 decision factor in freight. The shield shape signals dependability, while a subtle route-line motif inside the shield nods to the network effect of their operations.
+
+- **Primary mark:** Rounded shield outline with an internal path/route line
+- **Color:** Forest green (#065F46) shield with matte gold (#B8860B) route line
+- **Typography:** Instrument Serif for "APEX," DM Sans for "FREIGHT"
+- **Scalability:** Shield works standalone; paired lockup for collateral
+
+---
+
+## Moodboard Direction
+
+- **Textures:** Brushed metal, asphalt grain, shipping container corrugation
+- **Photography style:** Aerial fleet shots at golden hour, macro details on truck livery
+- **Competitor gap:** Most freight logos use generic globe/truck icons — all three concepts avoid this in favor of abstract marks that age well
+
+## Recommended Next Steps
+
+1. **Internal review** — Select 1–2 concepts for refinement (recommend A or C)
+2. **Color accessibility audit** — Verify WCAG AA contrast on all proposed palettes
+3. **Application mockups** — Generate trailer wrap, business card, and app icon previews
+4. **Brand motion** — Create a 2-second logo reveal animation for email signatures`
 
 const comment = (
   id: string,

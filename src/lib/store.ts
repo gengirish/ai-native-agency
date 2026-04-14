@@ -51,6 +51,48 @@ interface Store {
   users: (User & { password: string })[]
 }
 
+const SEED_USERS: Store["users"] = [
+  {
+    id: "u_admin",
+    name: "Priya Kapoor",
+    email: "admin@agencyos.demo",
+    password: "demo123",
+    role: "admin",
+    tenantId: "t_demo",
+    specialty: "Agency Operations",
+    createdAt: "2025-06-01T00:00:00.000Z",
+  },
+  {
+    id: "exp_maya",
+    name: "Maya Okonkwo",
+    email: "maya@agencyos.demo",
+    password: "demo123",
+    role: "expert",
+    tenantId: "t_demo",
+    specialty: "Brand & Identity Design",
+    createdAt: "2025-07-15T00:00:00.000Z",
+  },
+  {
+    id: "exp_jordan",
+    name: "Jordan Lee",
+    email: "jordan@agencyos.demo",
+    password: "demo123",
+    role: "expert",
+    tenantId: "t_demo",
+    specialty: "Motion & Social Media",
+    createdAt: "2025-08-01T00:00:00.000Z",
+  },
+  {
+    id: "u_client_lumen",
+    name: "Sarah Chen",
+    email: "sarah@agencyos.demo",
+    password: "demo123",
+    role: "client",
+    tenantId: "t_demo",
+    createdAt: "2025-09-10T00:00:00.000Z",
+  },
+]
+
 function createStore(): Store {
   return {
     projects: clone(demoProjects),
@@ -76,7 +118,7 @@ function createStore(): Store {
     usageRecords: clone(demoUsageRecords),
     brandProfiles: clone(demoBrandProfiles),
     dashboardStats: clone(demoDashboardStats),
-    users: [],
+    users: clone(SEED_USERS),
   }
 }
 
