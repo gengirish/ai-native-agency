@@ -2,13 +2,14 @@ import { NextRequest, NextResponse } from "next/server"
 import type { ProjectPriority, ProjectType } from "@/types"
 import { getUserFromRequest } from "@/lib/auth/jwt"
 import { createProject, getProjects } from "@/lib/dal"
-import { hasDb } from "@/lib/db"
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const projects = await getProjects()
+    const user = await getUserFromRequest(request)
+    const projects = await getProjects(user?.tenantId)
     return NextResponse.json({ data: projects })
-  } catch {
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -16,7 +17,7 @@ export async function GET(_request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
-    if (hasDb() && !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -29,8 +30,8 @@ export async function POST(request: NextRequest) {
       budget?: number
     }
 
-    const tenantId = user?.tenantId ?? "t_demo"
-    const createdBy = user?.id ?? "u_admin"
+    const tenantId = user.tenantId ?? "t_demo"
+    const createdBy = user.id
 
     const project = await createProject({
       tenantId,
@@ -44,7 +45,8 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ data: project }, { status: 201 })
-  } catch {
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

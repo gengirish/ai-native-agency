@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
+import { getUserFromRequest } from "@/lib/auth/jwt"
 import { updateExpertAssignment } from "@/lib/dal"
 
 type PatchBody = {
@@ -17,6 +18,11 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id } = await context.params
     let body: PatchBody
     try {
@@ -44,10 +50,7 @@ export async function PATCH(
 
     return NextResponse.json({ success: true, data: updated })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Update failed"
-    if (message.includes("invalid input syntax for type uuid")) {
-      return NextResponse.json({ error: { message: "Invalid assignment id", code: "VALIDATION" } }, { status: 400 })
-    }
-    return NextResponse.json({ error: { message, code: "INTERNAL" } }, { status: 500 })
+    console.error(`[API] ${request.method} ${request.url}:`, err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

@@ -4,6 +4,7 @@ import { useCallback, useState } from "react"
 import { Loader2, Sparkles } from "lucide-react"
 import type { ActionableItem, FeedbackTranslation } from "@/types"
 import { cn } from "@/lib/utils"
+import { translateClientFeedback } from "@/lib/api"
 import { CategoryTag, ConfidenceBadge, PriorityBadge } from "./feedback-badges"
 
 const DEFAULT_INPUT = "Make it feel more premium"
@@ -21,34 +22,12 @@ export function LiveTranslationDemo() {
     setResult(null)
     setError(null)
     try {
-      const res = await fetch("/api/feedback/translate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: trimmed }),
-      })
-      const json: unknown = await res.json().catch(() => null)
-      if (!res.ok) {
-        const msg =
-          json &&
-          typeof json === "object" &&
-          "error" in json &&
-          json.error &&
-          typeof (json as { error: { message?: string } }).error === "object"
-            ? String((json as { error: { message?: string } }).error.message ?? "Translation failed")
-            : "Translation failed"
-        setError(msg)
+      const out = await translateClientFeedback(trimmed)
+      if (!out.ok) {
+        setError(out.error)
         return
       }
-      if (
-        json &&
-        typeof json === "object" &&
-        "data" in json &&
-        (json as { data: FeedbackTranslation }).data
-      ) {
-        setResult((json as { data: FeedbackTranslation }).data)
-        return
-      }
-      setError("Unexpected response from server.")
+      setResult(out.data)
     } catch {
       setError("Network error. Please try again.")
     } finally {

@@ -1,18 +1,10 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
+import { getUserFromRequest } from "@/lib/auth/jwt"
 import { addReviewComment, getReviewById } from "@/lib/dal"
-import type { UserRole } from "@/types"
-
-const roles: UserRole[] = ["admin", "expert", "client"]
-
-function isUserRole(v: unknown): v is UserRole {
-  return typeof v === "string" && roles.includes(v as UserRole)
-}
 
 type PostBody = {
-  author?: string
-  authorRole?: unknown
   content?: string
 }
 
@@ -20,35 +12,37 @@ export async function POST(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await context.params
-  if (!(await getReviewById(id))) {
-    return NextResponse.json({ error: "Review not found" }, { status: 404 })
-  }
-
-  let body: PostBody
   try {
-    body = (await request.json()) as PostBody
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
+    const { id } = await context.params
+    if (!(await getReviewById(id))) {
+      return NextResponse.json({ error: "Review not found" }, { status: 404 })
+    }
+
+    let body: PostBody
+    try {
+      body = (await request.json()) as PostBody
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
+    }
+
+    if (typeof body.content !== "string" || !body.content.trim()) {
+      return NextResponse.json({ error: "content is required" }, { status: 400 })
+    }
+
+    const comment = await addReviewComment(id, {
+      author: user.name,
+      authorRole: user.role,
+      content: body.content,
+    })
+
+    return NextResponse.json(comment, { status: 201 })
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-
-  if (
-    typeof body.author !== "string" ||
-    !body.author.trim() ||
-    !isUserRole(body.authorRole) ||
-    typeof body.content !== "string"
-  ) {
-    return NextResponse.json(
-      { error: "author, authorRole, and content are required" },
-      { status: 400 },
-    )
-  }
-
-  const comment = await addReviewComment(id, {
-    author: body.author.trim(),
-    authorRole: body.authorRole,
-    content: body.content,
-  })
-
-  return NextResponse.json(comment, { status: 201 })
 }

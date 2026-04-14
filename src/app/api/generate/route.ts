@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server"
 import { generate } from "@/lib/ai/gateway"
+import { getUserFromRequest } from "@/lib/auth/jwt"
 import { createDeliverable, getProjectById, updateProject } from "@/lib/dal"
 import type { ProjectType } from "@/types"
 
@@ -26,6 +27,11 @@ const TYPE_PROMPTS: Record<ProjectType, string> = {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const body = (await request.json()) as {
       projectId: string
       title: string
@@ -49,61 +55,67 @@ export async function POST(request: NextRequest) {
 
     await updateProject(body.projectId, { status: "ai_generating" })
 
-    const systemPrompt = TYPE_PROMPTS[body.type] ?? TYPE_PROMPTS.blog_content
+    try {
+      const systemPrompt = TYPE_PROMPTS[body.type] ?? TYPE_PROMPTS.blog_content
 
-    const userPrompt = [
-      `Project: ${body.title}`,
-      body.description ? `Description: ${body.description}` : null,
-      body.clientName ? `Client: ${body.clientName}` : null,
-      body.budget ? `Budget: $${body.budget.toLocaleString()}` : null,
-      `\nGenerate a comprehensive, production-ready deliverable for this project. Format your output with clear sections using markdown headers. Be specific, creative, and actionable.`,
-    ]
-      .filter(Boolean)
-      .join("\n")
+      const userPrompt = [
+        `Project: ${body.title}`,
+        body.description ? `Description: ${body.description}` : null,
+        body.clientName ? `Client: ${body.clientName}` : null,
+        body.budget ? `Budget: $${body.budget.toLocaleString()}` : null,
+        `\nGenerate a comprehensive, production-ready deliverable for this project. Format your output with clear sections using markdown headers. Be specific, creative, and actionable.`,
+      ]
+        .filter(Boolean)
+        .join("\n")
 
-    const startTime = Date.now()
+      const startTime = Date.now()
 
-    const result = await generate({
-      messages: [
-        { role: "system", content: systemPrompt },
-        { role: "user", content: userPrompt },
-      ],
-      maxTokens: 3000,
-      temperature: 0.75,
-    })
+      const result = await generate({
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: userPrompt },
+        ],
+        maxTokens: 3000,
+        temperature: 0.75,
+      })
 
-    const generationTime = Date.now() - startTime
+      const generationTime = Date.now() - startTime
 
-    const deliverable = await createDeliverable({
-      projectId: body.projectId,
-      tenantId: project.clientId,
-      title: `${body.title} — AI Draft`,
-      type: body.type,
-      fileUrl: "",
-      aiModel: result.model,
-      generationCost: result.cost,
-      generationTime,
-      qualityScore: 0.85,
-      status: "qa_check",
-    })
+      const deliverable = await createDeliverable({
+        projectId: body.projectId,
+        tenantId: user.tenantId,
+        title: `${body.title} — AI Draft`,
+        type: body.type,
+        fileUrl: "",
+        aiModel: result.model,
+        generationCost: result.cost,
+        generationTime,
+        qualityScore: 0.85,
+        status: "qa_check",
+      })
 
-    const nextAiCost = project.aiCost + result.cost
-    await updateProject(body.projectId, {
-      status: "qa_check",
-      aiCost: nextAiCost,
-    })
+      const nextAiCost = project.aiCost + result.cost
+      await updateProject(body.projectId, {
+        status: "qa_check",
+        aiCost: nextAiCost,
+      })
 
-    return NextResponse.json({
-      deliverable,
-      generation: {
-        content: result.content,
-        model: result.model,
-        provider: result.provider,
-        tokensUsed: result.tokensUsed,
-        latencyMs: result.latencyMs,
-        cost: result.cost,
-      },
-    })
+      return NextResponse.json({
+        deliverable,
+        generation: {
+          content: result.content,
+          model: result.model,
+          provider: result.provider,
+          tokensUsed: result.tokensUsed,
+          latencyMs: result.latencyMs,
+          cost: result.cost,
+        },
+      })
+    } catch (err) {
+      await updateProject(body.projectId, { status: "draft" }).catch(() => {})
+      console.error("[API] POST /api/generate:", err)
+      return NextResponse.json({ error: "Generation failed" }, { status: 500 })
+    }
   } catch (err) {
     const message = err instanceof Error ? err.message : "Generation failed"
     return NextResponse.json({ error: message }, { status: 500 })

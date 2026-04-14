@@ -41,17 +41,41 @@ export const USERS = { admin: TEST_ADMIN, expert: TEST_EXPERT, client: TEST_CLIE
 const TEST_PASSWORD = "demo123"
 
 /**
- * Log in via the UI form using seeded credentials.
- * After this returns the page is on /dashboard with the sidebar visible.
+ * Log in by calling the login API directly, then injecting the token into
+ * the browser context (localStorage + cookie). Faster and more reliable than
+ * filling the UI form, especially with Neon cold starts and first-run
+ * Turbopack compilation.
  */
 export async function loginAs(page: Page, role: "admin" | "expert" | "client") {
   const user = USERS[role]
+  const baseURL = process.env.BASE_URL || "http://127.0.0.1:3000"
 
-  await page.goto("/login", { waitUntil: "domcontentloaded" })
+  const res = await fetch(`${baseURL}/api/auth/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email: user.email, password: TEST_PASSWORD }),
+  })
 
-  await page.locator("input[type='email']").fill(user.email)
-  await page.locator("input[type='password']").fill(TEST_PASSWORD)
-  await page.locator("button[type='submit']").click()
+  if (!res.ok) {
+    throw new Error(`Login API failed for ${role}: ${res.status} ${await res.text()}`)
+  }
 
-  await page.waitForURL("**/dashboard", { timeout: 30000 })
+  const data = (await res.json()) as { token: string }
+  const hostname = new URL(baseURL).hostname
+
+  await page.context().addCookies([
+    {
+      name: "agencyos_token",
+      value: data.token,
+      domain: hostname,
+      path: "/",
+    },
+  ])
+
+  // Inject token into localStorage before any page script runs.
+  // addInitScript fires before React hydrates, so the AuthProvider's
+  // useEffect will find the token on first mount.
+  await page.addInitScript(
+    `localStorage.setItem("agencyos_token", ${JSON.stringify(data.token)})`,
+  )
 }

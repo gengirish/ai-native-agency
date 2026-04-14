@@ -34,23 +34,29 @@ export async function POST(request: NextRequest) {
   }
 
   const normalizedEmail = email.trim().toLowerCase()
-  const user = await findUserByEmail(normalizedEmail)
 
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
+  try {
+    const user = await findUserByEmail(normalizedEmail)
+
+    if (!user || !verifyPassword(password, user.passwordHash)) {
+      return NextResponse.json({ error: "Invalid email or password" }, { status: 401 })
+    }
+
+    const token = await signToken({
+      sub: user.id,
+      email: user.email,
+      role: user.role,
+      tenantId: user.tenantId,
+    })
+
+    const { passwordHash: _h, ...publicUser } = user
+
+    return NextResponse.json({
+      user: publicUser,
+      token,
+    })
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-
-  const token = await signToken({
-    sub: user.id,
-    email: user.email,
-    role: user.role,
-    tenantId: user.tenantId,
-  })
-
-  const { passwordHash: _h, ...publicUser } = user
-
-  return NextResponse.json({
-    user: publicUser,
-    token,
-  })
 }

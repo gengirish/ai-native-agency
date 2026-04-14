@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server"
 import { getUserFromRequest } from "@/lib/auth/jwt"
 import { createLead, getLeads } from "@/lib/dal"
-import { hasDb } from "@/lib/db"
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const leads = await getLeads()
+    const user = await getUserFromRequest(request)
+    const leads = await getLeads(user?.tenantId)
     return NextResponse.json({ data: leads })
-  } catch {
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -15,7 +16,7 @@ export async function GET(_request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const user = await getUserFromRequest(request)
-    if (hasDb() && !user) {
+    if (!user) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
 
@@ -29,7 +30,7 @@ export async function POST(request: NextRequest) {
     }
 
     const lead = await createLead({
-      tenantId: user?.tenantId ?? "t_demo",
+      tenantId: user.tenantId ?? "t_demo",
       company: body.company ?? "",
       contactName: body.contactName ?? "",
       email: body.email ?? "",
@@ -39,7 +40,8 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ data: lead }, { status: 201 })
-  } catch {
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

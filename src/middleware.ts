@@ -1,23 +1,29 @@
-import { NextResponse } from "next/server"
-import type { NextRequest } from "next/server"
+import { NextRequest, NextResponse } from "next/server"
 
-const PUBLIC_PATHS = ["/", "/login", "/api/auth", "/api/generate"]
-const PUBLIC_PREFIXES = ["/api/"]
+const PUBLIC_PATHS = [
+  "/",
+  "/login",
+  "/api/auth/login",
+  "/api/auth/register",
+  "/api/auth/me",
+  "/api/health",
+]
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
+  // Allow public paths
   if (PUBLIC_PATHS.some((p) => (p === "/" ? pathname === "/" : pathname.startsWith(p)))) {
     return NextResponse.next()
   }
 
-  if (PUBLIC_PREFIXES.some((p) => pathname.startsWith(p))) {
-    return NextResponse.next()
-  }
-
+  // Check for auth cookie (JWT verified per-route in getUserFromRequest)
   const token = request.cookies.get("agencyos_token")?.value
-
   if (!token) {
+    // API routes get 401, pages get redirected
+    if (pathname.startsWith("/api/")) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
     const loginUrl = new URL("/login", request.nextUrl.origin)
     loginUrl.searchParams.set("callbackUrl", pathname)
     return NextResponse.redirect(loginUrl)

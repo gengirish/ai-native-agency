@@ -8,21 +8,21 @@ test.describe("Dashboard", () => {
   })
 
   test("displays Dashboard heading", async ({ page }) => {
-    await expect(page.locator("h1:has-text('Dashboard')")).toBeVisible({ timeout: 15000 })
+    await expect(page.locator("h1:has-text('Dashboard')")).toBeVisible()
   })
 
   test("shows KPI cards section", async ({ page }) => {
-    await expect(page.locator("text=/revenue|projects|margin|quality/i").first()).toBeVisible({ timeout: 15000 })
+    await expect(page.locator("text=/revenue|projects|margin|quality/i").first()).toBeVisible()
   })
 
   test("shows empty or data state for revenue chart", async ({ page }) => {
     const chart = page.locator(".recharts-wrapper").first()
     const empty = page.locator("text=/no data|no revenue/i").first()
-    await expect(chart.or(empty)).toBeVisible({ timeout: 15000 })
+    await expect(chart.or(empty)).toBeVisible()
   })
 
   test("shows empty or data state for projects", async ({ page }) => {
     const content = page.locator("text=/active projects|total projects|no projects|no data/i").first()
-    await expect(content).toBeVisible({ timeout: 15000 })
+    await expect(content).toBeVisible()
   })
 })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 
 import { generate } from "@/lib/ai/gateway"
+import { getUserFromRequest } from "@/lib/auth/jwt"
 import type { ActionableItem, FeedbackTranslation } from "@/types"
 
 const DEMO_ACTIONABLE: ActionableItem[] = [
@@ -55,6 +56,11 @@ function parseActionableItems(raw: unknown): ActionableItem[] {
 
 export async function POST(request: NextRequest) {
   try {
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     let body: { text?: string }
     try {
       body = (await request.json()) as { text?: string }
@@ -111,7 +117,7 @@ Respond with ONLY valid JSON (no markdown fences), shape:
 
     return NextResponse.json({ data })
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Translation failed"
-    return NextResponse.json({ error: { message, code: "INTERNAL" } }, { status: 500 })
+    console.error(`[API] ${request.method} ${request.url}:`, err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

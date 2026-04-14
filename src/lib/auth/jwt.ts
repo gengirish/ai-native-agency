@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server"
 import { findUserById } from "@/lib/dal"
 import type { User } from "@/types"
 
-const JWT_SECRET = "agencyos-demo-secret-change-in-prod"
+const JWT_SECRET = process.env.JWT_SECRET || "agencyos-dev-secret-not-for-production"
 const HEADER = { alg: "HS256", typ: "JWT" } as const
 
 export type JwtPayload = {
@@ -144,24 +144,15 @@ export async function getUserFromRequest(request: NextRequest): Promise<User | n
   if (!payload) return null
 
   const dbUser = await findUserById(payload.sub)
-  if (dbUser) {
-    return {
-      id: dbUser.id,
-      name: dbUser.name,
-      email: dbUser.email,
-      role: dbUser.role,
-      tenantId: dbUser.tenantId,
-      specialty: dbUser.specialty,
-      createdAt: dbUser.createdAt,
-    }
-  }
+  if (!dbUser) return null
 
   return {
-    id: payload.sub,
-    name: "",
-    email: payload.email,
-    role: payload.role as User["role"],
-    tenantId: payload.tenantId,
-    createdAt: "",
+    id: dbUser.id,
+    name: dbUser.name,
+    email: dbUser.email,
+    role: dbUser.role,
+    tenantId: dbUser.tenantId,
+    specialty: dbUser.specialty,
+    createdAt: dbUser.createdAt,
   }
 }

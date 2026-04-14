@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
 import type { ProjectPriority, ProjectStatus } from "@/types"
+import { getUserFromRequest } from "@/lib/auth/jwt"
 import { getProjectById, updateProject } from "@/lib/dal"
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
   try {
@@ -13,7 +14,8 @@ export async function GET(
       return NextResponse.json({ error: "Not found" }, { status: 404 })
     }
     return NextResponse.json({ data: project })
-  } catch {
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }
@@ -23,6 +25,11 @@ export async function PATCH(
   context: { params: Promise<{ id: string }> },
 ) {
   try {
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
+    }
+
     const { id } = await context.params
     const existing = await getProjectById(id)
     if (!existing) {
@@ -45,7 +52,8 @@ export async function PATCH(
     }
 
     return NextResponse.json({ data: project })
-  } catch {
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

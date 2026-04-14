@@ -70,6 +70,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearTokenCookie()
       })
       .finally(() => setIsLoading(false))
+
+    const interval = setInterval(async () => {
+      const t = localStorage.getItem("agencyos_token")
+      if (!t) return
+      try {
+        const res = await fetch("/api/auth/me", {
+          headers: { Authorization: `Bearer ${t}` },
+        })
+        if (!res.ok) {
+          localStorage.removeItem("agencyos_token")
+          clearTokenCookie()
+          setUser(null)
+        }
+      } catch {
+        /* network error, skip */
+      }
+    }, 5 * 60 * 1000)
+
+    return () => clearInterval(interval)
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {

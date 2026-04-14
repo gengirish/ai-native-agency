@@ -321,21 +321,18 @@ export async function updateProject(
     const statusDb = patch.status !== undefined ? appProjectStatusToDb(patch.status) : null
     const priorityDb =
       patch.priority !== undefined ? projectPriorityPatchToDb(patch.priority) : null
+    const expertIdProvided = patch.expertId !== undefined
+    const expertIdForDb = expertIdProvided ? patch.expertId : null
     await sql`
       UPDATE projects SET
         status = COALESCE(${statusDb}, status),
         quality_score = COALESCE(${patch.qualityScore ?? null}, quality_score),
         ai_cost_cents = COALESCE(${patch.aiCost !== undefined ? Math.round(patch.aiCost * 100) : null}, ai_cost_cents),
         priority = COALESCE(${priorityDb}, priority),
+        assigned_expert = CASE WHEN ${expertIdProvided} THEN ${expertIdForDb}::uuid ELSE assigned_expert END,
         updated_at = now()
       WHERE id = ${id}::uuid
     `
-    if (patch.expertId !== undefined) {
-      await sql`
-        UPDATE projects SET assigned_expert = ${patch.expertId}, updated_at = now()
-        WHERE id = ${id}::uuid
-      `
-    }
     return getProjectById(id)
   }
   const p = store.projects.find((p) => p.id === id)
@@ -571,14 +568,12 @@ export async function addReviewComment(
   }
   if (hasDb()) {
     const sql = getDb()!
-    const review = await getReviewById(reviewId)
-    if (review) {
-      const comments = [...review.comments, newComment]
-      await sql`
-        UPDATE expert_reviews SET refinements = ${JSON.stringify(comments)}
-        WHERE id = ${reviewId}::uuid
-      `
-    }
+    const appended = JSON.stringify([newComment])
+    await sql`
+      UPDATE expert_reviews
+      SET refinements = refinements || ${appended}::jsonb
+      WHERE id = ${reviewId}::uuid
+    `
     return newComment
   }
   const r = store.reviews.find((r) => r.id === reviewId)
@@ -895,12 +890,25 @@ export async function getPipelines(): Promise<Pipeline[]> {
       JOIN projects p ON p.id = pr.project_id
       ORDER BY pr.created_at DESC
     `
-    const pipelines: Pipeline[] = []
-    for (const r of rows) {
-      const taskRows = await sql`
-        SELECT * FROM pipeline_tasks WHERE pipeline_run_id = ${r.id}::uuid ORDER BY sort_order
-      `
-      pipelines.push({
+    const runIds = rows.map((r) => String(r.id))
+    const allTaskRows =
+      runIds.length === 0
+        ? []
+        : await sql`
+            SELECT * FROM pipeline_tasks
+            WHERE pipeline_run_id = ANY(${runIds}::uuid[])
+            ORDER BY pipeline_run_id, sort_order
+          `
+    const tasksByRunId = new Map<string, Record<string, unknown>[]>()
+    for (const t of allTaskRows) {
+      const runId = String(t.pipeline_run_id)
+      const list = tasksByRunId.get(runId)
+      if (list) list.push(t)
+      else tasksByRunId.set(runId, [t])
+    }
+    return rows.map((r) => {
+      const taskRows = tasksByRunId.get(String(r.id)) ?? []
+      return {
         id: String(r.id),
         projectId: String(r.project_id),
         projectTitle: String(r.project_title ?? ""),
@@ -910,9 +918,8 @@ export async function getPipelines(): Promise<Pipeline[]> {
         totalTime: 0,
         startedAt: r.started_at ? new Date(r.started_at as string).toISOString() : "",
         completedAt: r.completed_at ? new Date(r.completed_at as string).toISOString() : undefined,
-      })
-    }
-    return pipelines
+      }
+    })
   }
   return store.pipelines
 }

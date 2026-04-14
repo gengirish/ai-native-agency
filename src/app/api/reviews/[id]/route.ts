@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server"
 import { NextResponse } from "next/server"
 
+import { getUserFromRequest } from "@/lib/auth/jwt"
 import { getReviewById, updateDeliverable, updateReview } from "@/lib/dal"
 import { hasDb } from "@/lib/db"
 import type { ReviewStatus } from "@/types"
@@ -27,66 +28,81 @@ function mapReviewStatusToDb(status: ReviewStatus): string {
 }
 
 export async function GET(
-  _request: NextRequest,
+  request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await context.params
-  const review = await getReviewById(id)
-  if (!review) {
-    return NextResponse.json({ error: "Review not found" }, { status: 404 })
+  try {
+    const { id } = await context.params
+    const review = await getReviewById(id)
+    if (!review) {
+      return NextResponse.json({ error: "Review not found" }, { status: 404 })
+    }
+    return NextResponse.json(review)
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
-  return NextResponse.json(review)
 }
 
 export async function PATCH(
   request: NextRequest,
   context: { params: Promise<{ id: string }> },
 ) {
-  const { id } = await context.params
-  const reviewBefore = await getReviewById(id)
-  if (!reviewBefore) {
-    return NextResponse.json({ error: "Review not found" }, { status: 404 })
-  }
-
-  let body: PatchBody
   try {
-    body = (await request.json()) as PatchBody
-  } catch {
-    return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
-  }
-
-  if (body.status !== undefined) {
-    if (!isPatchStatus(body.status)) {
-      return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+    const user = await getUserFromRequest(request)
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 })
     }
-  }
 
-  if (body.rating !== undefined) {
-    if (typeof body.rating !== "number" || Number.isNaN(body.rating)) {
-      return NextResponse.json({ error: "Invalid rating" }, { status: 400 })
+    const { id } = await context.params
+    const reviewBefore = await getReviewById(id)
+    if (!reviewBefore) {
+      return NextResponse.json({ error: "Review not found" }, { status: 404 })
     }
-  }
 
-  const deliverableId = reviewBefore.deliverableId
-
-  const patch: { status?: string; rating?: number } = {}
-  if (body.status !== undefined) {
-    patch.status = hasDb() ? mapReviewStatusToDb(body.status) : body.status
-  }
-  if (body.rating !== undefined) patch.rating = body.rating
-
-  const updated = await updateReview(id, patch)
-  if (!updated) {
-    return NextResponse.json({ error: "Review not found" }, { status: 404 })
-  }
-
-  if (body.status !== undefined && deliverableId) {
-    if (body.status === "approved") {
-      await updateDeliverable(deliverableId, { status: "approved" })
-    } else if (body.status === "revision_requested") {
-      await updateDeliverable(deliverableId, { status: "revision" })
+    let body: PatchBody
+    try {
+      body = (await request.json()) as PatchBody
+    } catch {
+      return NextResponse.json({ error: "Invalid JSON body" }, { status: 400 })
     }
-  }
 
-  return NextResponse.json(updated)
+    if (body.status !== undefined) {
+      if (!isPatchStatus(body.status)) {
+        return NextResponse.json({ error: "Invalid status" }, { status: 400 })
+      }
+    }
+
+    if (body.rating !== undefined) {
+      if (typeof body.rating !== "number" || Number.isNaN(body.rating)) {
+        return NextResponse.json({ error: "Invalid rating" }, { status: 400 })
+      }
+    }
+
+    const deliverableId = reviewBefore.deliverableId
+
+    const patch: { status?: string; rating?: number } = {}
+    if (body.status !== undefined) {
+      patch.status = hasDb() ? mapReviewStatusToDb(body.status) : body.status
+    }
+    if (body.rating !== undefined) patch.rating = body.rating
+
+    const updated = await updateReview(id, patch)
+    if (!updated) {
+      return NextResponse.json({ error: "Review not found" }, { status: 404 })
+    }
+
+    if (body.status !== undefined && deliverableId) {
+      if (body.status === "approved") {
+        await updateDeliverable(deliverableId, { status: "approved" })
+      } else if (body.status === "revision_requested") {
+        await updateDeliverable(deliverableId, { status: "revision" })
+      }
+    }
+
+    return NextResponse.json(updated)
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 })
+  }
 }

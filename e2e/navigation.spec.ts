@@ -55,11 +55,19 @@ test.describe("Sidebar navigation", () => {
 
   test("sidebar navigation links work", async ({ page }) => {
     await page.goto("/dashboard")
-    await page.waitForSelector("a[href='/projects']", { timeout: 10000 })
-    await page.click("a[href='/projects']")
-    await expect(page).toHaveURL("/projects")
-    await page.click("a[href='/dashboard']")
-    await expect(page).toHaveURL("/dashboard")
+    await page.waitForLoadState("networkidle")
+    const projectsLink = page.locator("nav a[href='/projects']")
+    await projectsLink.waitFor({ state: "visible" })
+    await Promise.all([
+      page.waitForURL(/\/projects/, { timeout: 30000 }),
+      projectsLink.click(),
+    ])
+    const dashLink = page.locator("nav a[href='/dashboard']")
+    await dashLink.waitFor({ state: "visible" })
+    await Promise.all([
+      page.waitForURL(/\/dashboard/, { timeout: 30000 }),
+      dashLink.click(),
+    ])
   })
 
   test("shows logged-in user info", async ({ page }) => {

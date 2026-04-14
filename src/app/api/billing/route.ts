@@ -1,15 +1,18 @@
 import { NextRequest, NextResponse } from "next/server"
+import { getUserFromRequest } from "@/lib/auth/jwt"
 import { getBilling } from "@/lib/dal"
 
-export async function GET(_request: NextRequest) {
+export async function GET(request: NextRequest) {
   try {
-    const { invoices, creditPacks, usage } = await getBilling()
+    const user = await getUserFromRequest(request)
+    const { invoices, creditPacks, usage } = await getBilling(user?.tenantId)
     return NextResponse.json({
       invoices,
       creditPacks,
       usage,
     })
-  } catch {
+  } catch (err) {
+    console.error(`[API] ${request.method} ${request.url}:`, err)
     return NextResponse.json({ error: "Internal server error" }, { status: 500 })
   }
 }

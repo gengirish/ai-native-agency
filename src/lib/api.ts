@@ -1,4 +1,3 @@
-import { getToken } from "@/lib/auth/context"
 import type {
   Project,
   ProjectPriority,
@@ -27,11 +26,14 @@ import type {
   UsageRecord,
 } from "@/types"
 
+function authHeaders(): HeadersInit {
+  if (typeof window === "undefined") return {}
+  const token = localStorage.getItem("agencyos_token")
+  return token ? { Authorization: `Bearer ${token}` } : {}
+}
+
 function authHeadersJson(): HeadersInit {
-  const token = typeof window !== "undefined" ? getToken() : null
-  const headers: Record<string, string> = { "Content-Type": "application/json" }
-  if (token) headers.Authorization = `Bearer ${token}`
-  return headers
+  return { "Content-Type": "application/json", ...authHeaders() }
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -46,7 +48,7 @@ function readDataArray<T>(json: unknown): T[] {
 
 async function fetchDataArray<T>(path: string): Promise<T[]> {
   try {
-    const res = await fetch(path)
+    const res = await fetch(path, { headers: authHeaders() })
     if (!res.ok) return []
     const json: unknown = await res.json()
     return readDataArray<T>(json)
@@ -67,7 +69,7 @@ async function loadBilling(): Promise<BillingBundle> {
   if (!billingInflight) {
     billingInflight = (async (): Promise<BillingBundle> => {
       try {
-        const res = await fetch("/api/billing")
+        const res = await fetch("/api/billing", { headers: authHeaders() })
         if (!res.ok) {
           return { invoices: [], creditPacks: [], usage: [] }
         }
@@ -107,7 +109,7 @@ async function loadPublishing(): Promise<PublishingBundle> {
   if (!publishingInflight) {
     publishingInflight = (async (): Promise<PublishingBundle> => {
       try {
-        const res = await fetch("/api/publishing")
+        const res = await fetch("/api/publishing", { headers: authHeaders() })
         if (!res.ok) {
           return { jobs: [], channels: [] }
         }
@@ -142,7 +144,7 @@ async function loadSla(): Promise<SlaBundle> {
   if (!slaInflight) {
     slaInflight = (async (): Promise<SlaBundle> => {
       try {
-        const res = await fetch("/api/sla")
+        const res = await fetch("/api/sla", { headers: authHeaders() })
         if (!res.ok) {
           return { tiers: [], compliance: [] }
         }
@@ -318,7 +320,7 @@ function isDashboardStats(value: unknown): value is DashboardStats {
 
 export async function getDashboardStats(): Promise<DashboardStats> {
   try {
-    const res = await fetch("/api/dashboard/stats")
+    const res = await fetch("/api/dashboard/stats", { headers: authHeaders() })
     if (!res.ok) return emptyDashboardStats
     const json: unknown = await res.json()
     if (!isRecord(json)) return emptyDashboardStats
@@ -374,7 +376,7 @@ export async function updateProjectStatus(
   try {
     const res = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify({ status }),
     })
     if (!res.ok) return null
@@ -395,7 +397,7 @@ export async function updateReview(
   try {
     const res = await fetch(`/api/reviews/${encodeURIComponent(id)}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...authHeaders() },
       body: JSON.stringify(patch),
     })
     if (!res.ok) return null
@@ -409,15 +411,15 @@ export async function updateReview(
 
 export async function addReviewComment(
   reviewId: string,
-  comment: { author: string; authorRole: string; content: string },
+  comment: { content: string },
 ): Promise<unknown> {
   try {
     const res = await fetch(
       `/api/reviews/${encodeURIComponent(reviewId)}/comments`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(comment),
+        headers: { "Content-Type": "application/json", ...authHeaders() },
+        body: JSON.stringify({ content: comment.content }),
       },
     )
     if (!res.ok) return null
@@ -516,5 +518,46 @@ export async function patchLead(
     return json.data as Lead
   } catch {
     return null
+  }
+}
+
+/** POST /api/feedback/translate — requires auth */
+export async function translateClientFeedback(
+  text: string,
+): Promise<{ ok: true; data: FeedbackTranslation } | { ok: false; error: string }> {
+  try {
+    const res = await fetch("/api/feedback/translate", {
+      method: "POST",
+      headers: authHeadersJson(),
+      body: JSON.stringify({ text }),
+    })
+    const json: unknown = await res.json().catch(() => null)
+    if (!res.ok) {
+      let message = "Translation failed"
+      if (json && typeof json === "object" && "error" in json) {
+        const e = (json as { error: unknown }).error
+        if (typeof e === "string") message = e
+        else if (
+          e &&
+          typeof e === "object" &&
+          "message" in e &&
+          typeof (e as { message: unknown }).message === "string"
+        ) {
+          message = (e as { message: string }).message
+        }
+      }
+      return { ok: false, error: message }
+    }
+    if (
+      json &&
+      typeof json === "object" &&
+      "data" in json &&
+      (json as { data: FeedbackTranslation }).data
+    ) {
+      return { ok: true, data: (json as { data: FeedbackTranslation }).data }
+    }
+    return { ok: false, error: "Unexpected response from server." }
+  } catch {
+    return { ok: false, error: "Network error. Please try again." }
   }
 }

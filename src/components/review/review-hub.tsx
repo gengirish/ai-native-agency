@@ -100,11 +100,7 @@ export function ReviewHub() {
     setReviews((prev) =>
       prev.map((r) => (r.id === reviewId ? { ...r, comments: [...r.comments, comment] } : r)),
     )
-    void addReviewComment(reviewId, {
-      author: comment.author,
-      authorRole: comment.authorRole,
-      content: comment.content,
-    })
+    void addReviewComment(reviewId, { content: comment.content })
   }, [])
 
   const deliverable = selectedReview ? deliverablesById.get(selectedReview.deliverableId) : undefined

@@ -6,11 +6,7 @@ import { createUser, findUserByEmail } from "@/lib/dal"
 import { getDb, hasDb } from "@/lib/db"
 import type { UserRole } from "@/types"
 
-const ROLES: UserRole[] = ["admin", "expert", "client"]
-
-function isUserRole(v: unknown): v is UserRole {
-  return typeof v === "string" && (ROLES as readonly string[]).includes(v)
-}
+const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 async function resolveDefaultTenantId(): Promise<string> {
   if (!hasDb()) return "t_demo"
@@ -40,27 +36,35 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 })
   }
 
-  const { name, email, password, role } = body as Record<string, unknown>
+  const { name, email, password } = body as Record<string, unknown>
 
-  if (
-    typeof name !== "string" ||
-    typeof email !== "string" ||
-    typeof password !== "string" ||
-    !isUserRole(role)
-  ) {
+  if (typeof name !== "string" || typeof email !== "string" || typeof password !== "string") {
     return NextResponse.json(
-      { error: "Missing or invalid fields: name, email, password, role" },
+      { error: "Missing or invalid fields: name, email, password" },
       { status: 400 },
     )
   }
 
   const normalizedEmail = email.trim().toLowerCase()
-  if (!normalizedEmail || !name.trim() || !password) {
+  if (!normalizedEmail || !name.trim()) {
     return NextResponse.json(
-      { error: "Missing or invalid fields: name, email, password, role" },
+      { error: "Missing or invalid fields: name, email, password" },
       { status: 400 },
     )
   }
+
+  if (!EMAIL_PATTERN.test(normalizedEmail)) {
+    return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
+  }
+
+  if (password.length < 8) {
+    return NextResponse.json(
+      { error: "Password must be at least 8 characters" },
+      { status: 400 },
+    )
+  }
+
+  const role: UserRole = "client"
 
   const existing = await findUserByEmail(normalizedEmail)
   if (existing) {

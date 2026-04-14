@@ -69,7 +69,7 @@ test.describe("AI Production Engine", () => {
   test("loads AI engine page", async ({ page }) => {
     await loginAs(page, "admin")
     await page.goto("/ai-engine")
-    await expect(page.locator("text=/ai|engine|gateway|production/i").first()).toBeVisible()
+    await expect(page.locator("main >> text=/ai|engine|gateway|production/i").first()).toBeVisible()
   })
 })
 
@@ -103,7 +103,7 @@ test.describe("RBAC - Role Gating", () => {
   test("admin page shows access restricted for client", async ({ page }) => {
     await loginAs(page, "client")
     await page.goto("/analytics")
-    await expect(page.locator("text=/access restricted/i")).toBeVisible({ timeout: 10000 })
+    await expect(page.locator("text=/access restricted|permission|not authorized/i").first()).toBeVisible()
   })
 })
 

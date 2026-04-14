@@ -18,16 +18,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [isLoading, isAuthenticated, isLoginPage, isLandingPage, router])
 
+  if (isLoginPage || isLandingPage) {
+    return <>{children}</>
+  }
+
   if (isLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-slate-50">
-        <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+        <div role="status" aria-label="Loading">
+          <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
+          <span className="sr-only">Loading...</span>
+        </div>
       </div>
     )
-  }
-
-  if (isLoginPage || isLandingPage) {
-    return <>{children}</>
   }
 
   if (!isAuthenticated) {
