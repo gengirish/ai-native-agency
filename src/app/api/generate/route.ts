@@ -1,0 +1,115 @@
+import { NextRequest, NextResponse } from "next/server"
+import { generate } from "@/lib/ai/gateway"
+import { store, uid } from "@/lib/store"
+import type { Deliverable, ProjectType, ProjectStatus } from "@/types"
+
+const TYPE_PROMPTS: Record<ProjectType, string> = {
+  logo_design:
+    "You are a world-class brand designer. Generate a detailed creative brief breakdown, logo concept description, moodboard direction, and 3 distinct logo concept directions with rationale for each.",
+  social_media:
+    "You are an expert social media strategist. Generate a content calendar overview, 5 post concepts with captions, hashtag strategy, and engagement tactics for the brand.",
+  brand_identity:
+    "You are a brand identity specialist. Generate a complete brand identity system including values, voice guidelines, visual direction, typography recommendations, and color palette rationale.",
+  marketing_collateral:
+    "You are a marketing creative director. Generate concepts for a cohesive marketing collateral suite including brochure outline, flyer concepts, presentation deck structure, and business card design direction.",
+  video_ad:
+    "You are a video advertising creative director. Generate a 30-second video ad script with scene-by-scene breakdown, voiceover text, visual direction, music/sound design notes, and a call-to-action strategy.",
+  legal_document:
+    "You are a legal document specialist. Generate a well-structured document outline, key clauses to include, compliance considerations, and plain-language summaries for each section.",
+  blog_content:
+    "You are an expert content strategist. Generate 3 blog post outlines with SEO-optimized titles, meta descriptions, section breakdowns, and internal linking strategy.",
+  email_campaign:
+    "You are an email marketing specialist. Generate a 5-email drip sequence with subject lines, preview text, body copy outlines, CTAs, and segmentation recommendations.",
+  ad_creative:
+    "You are a performance marketing creative director. Generate ad copy variations for 3 platforms (Meta, Google, LinkedIn) with headlines, descriptions, CTA options, and A/B testing recommendations.",
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = (await request.json()) as {
+      projectId: string
+      title: string
+      type: ProjectType
+      description?: string
+      clientName?: string
+      budget?: number
+    }
+
+    if (!body.projectId || !body.type) {
+      return NextResponse.json(
+        { error: "projectId and type are required" },
+        { status: 400 },
+      )
+    }
+
+    const project = store.projects.find((p) => p.id === body.projectId)
+    if (!project) {
+      return NextResponse.json({ error: "Project not found" }, { status: 404 })
+    }
+
+    project.status = "ai_generating" as ProjectStatus
+
+    const systemPrompt = TYPE_PROMPTS[body.type] ?? TYPE_PROMPTS.blog_content
+
+    const userPrompt = [
+      `Project: ${body.title}`,
+      body.description ? `Description: ${body.description}` : null,
+      body.clientName ? `Client: ${body.clientName}` : null,
+      body.budget ? `Budget: $${body.budget.toLocaleString()}` : null,
+      `\nGenerate a comprehensive, production-ready deliverable for this project. Format your output with clear sections using markdown headers. Be specific, creative, and actionable.`,
+    ]
+      .filter(Boolean)
+      .join("\n")
+
+    const startTime = Date.now()
+
+    const result = await generate({
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: userPrompt },
+      ],
+      maxTokens: 3000,
+      temperature: 0.75,
+    })
+
+    const generationTime = Date.now() - startTime
+
+    const deliverable: Deliverable = {
+      id: uid("del"),
+      projectId: body.projectId,
+      version: 1,
+      title: `${body.title} — AI Draft`,
+      type: body.type,
+      fileUrl: "",
+      thumbnailUrl: "",
+      status: "qa_check",
+      aiModel: result.model,
+      generationCost: result.cost,
+      generationTime,
+      qualityScore: 0.85,
+      createdAt: new Date().toISOString(),
+    }
+
+    store.deliverables.push(deliverable)
+
+    project.status = "qa_check"
+    project.deliverableCount += 1
+    project.aiCost += result.cost
+    project.updatedAt = new Date().toISOString()
+
+    return NextResponse.json({
+      deliverable,
+      generation: {
+        content: result.content,
+        model: result.model,
+        provider: result.provider,
+        tokensUsed: result.tokensUsed,
+        latencyMs: result.latencyMs,
+        cost: result.cost,
+      },
+    })
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Generation failed"
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}

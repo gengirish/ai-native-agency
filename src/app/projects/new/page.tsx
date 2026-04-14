@@ -13,7 +13,7 @@ import { BriefStepIndicator } from "@/components/brief/brief-step-indicator"
 import { BriefWizardNavigation } from "@/components/brief/brief-wizard-navigation"
 import { RequireRole } from "@/components/auth/require-role"
 import { DELIVERABLES_BY_TYPE } from "@/components/brief/deliverables-by-type"
-import { createProject, getBrandProfiles } from "@/lib/api"
+import { createProject, generateDeliverable, getBrandProfiles } from "@/lib/api"
 import { useAuth } from "@/lib/auth/context"
 import type { BrandProfile } from "@/types"
 import Link from "next/link"
@@ -91,18 +91,35 @@ export default function NewBriefPage() {
       dueDate,
       ...(budget !== undefined ? { budget } : {}),
     })
-    setSubmitting(false)
     if (!project) {
+      setSubmitting(false)
       setSubmitError("Could not create the project. Please try again.")
       return
     }
-    try {
-      sessionStorage.setItem(BRIEF_CREATED_FLAG, "1")
-    } catch {
-      /* private mode */
+
+    const genResult = await generateDeliverable({
+      projectId: project.id,
+      title: project.title,
+      type: form.projectType,
+      description: form.description,
+      clientName,
+      budget,
+    })
+
+    setSubmitting(false)
+
+    if (genResult) {
+      try {
+        sessionStorage.setItem("agencyos:gen-result", JSON.stringify(genResult))
+      } catch { /* private mode */ }
+      router.push(`/projects/${project.id}/generated`)
+    } else {
+      try {
+        sessionStorage.setItem(BRIEF_CREATED_FLAG, "1")
+      } catch { /* private mode */ }
+      router.push("/projects")
     }
-    router.push("/projects")
-  }, [form.budget, form.deadline, form.projectType, form.title, router, submitting, user?.name])
+  }, [form.budget, form.deadline, form.description, form.projectType, form.title, router, submitting, user?.name])
 
   const goNext = () => {
     if (step === TOTAL_STEPS) {
@@ -207,7 +224,7 @@ export default function NewBriefPage() {
                 nextDisabled={!canProceed() || submitting}
                 isLastStep={step === TOTAL_STEPS}
                 isSubmitting={submitting}
-                nextLabel="Continue"
+                nextLabel={submitting ? "Generating with AI..." : "Continue"}
               />
             </div>
           </div>

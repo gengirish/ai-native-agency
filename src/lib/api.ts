@@ -418,6 +418,51 @@ export async function addReviewComment(
   }
 }
 
+export interface GenerateInput {
+  projectId: string
+  title: string
+  type: ProjectType
+  description?: string
+  clientName?: string
+  budget?: number
+}
+
+export interface GenerationResult {
+  deliverable: {
+    id: string
+    projectId: string
+    title: string
+    type: string
+    aiModel: string
+    generationCost: number
+    generationTime: number
+  }
+  generation: {
+    content: string
+    model: string
+    provider: string
+    tokensUsed: number
+    latencyMs: number
+    cost: number
+  }
+}
+
+export async function generateDeliverable(
+  input: GenerateInput,
+): Promise<GenerationResult | null> {
+  try {
+    const res = await fetch("/api/generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    })
+    if (!res.ok) return null
+    return (await res.json()) as GenerationResult
+  } catch {
+    return null
+  }
+}
+
 export async function updateLeadStatus(
   id: string,
   status: string,
