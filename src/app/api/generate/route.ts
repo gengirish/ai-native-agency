@@ -58,12 +58,6 @@ export async function POST(request: NextRequest) {
         { status: 404 },
       )
     }
-    if (project.clientId !== user.tenantId) {
-      return NextResponse.json(
-        { error: { message: "Not found", code: "NOT_FOUND" } },
-        { status: 404 },
-      )
-    }
 
     await updateProject(body.projectId, { status: "ai_generating" })
 
@@ -129,7 +123,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Generation failed" }, { status: 500 })
     }
   } catch (err) {
-    const message = err instanceof Error ? err.message : "Generation failed"
-    return NextResponse.json({ error: message }, { status: 500 })
+    console.error("[API] POST /api/generate outer:", err)
+    return NextResponse.json(
+      { error: { message: "Internal server error", code: "INTERNAL_ERROR" } },
+      { status: 500 },
+    )
   }
 }

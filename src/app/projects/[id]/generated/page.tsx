@@ -12,7 +12,7 @@ import {
   Sparkles,
   Zap,
 } from "lucide-react"
-import { sendToReview, type GenerationResult } from "@/lib/api"
+import { authHeaders, sendToReview, type GenerationResult } from "@/lib/api"
 
 export default function GeneratedPage() {
   const params = useParams()
@@ -34,7 +34,9 @@ export default function GeneratedPage() {
       }
     } catch { /* noop */ }
 
-    fetch(`/api/projects/${encodeURIComponent(projectId)}/generated`)
+    fetch(`/api/projects/${encodeURIComponent(projectId)}/generated`, {
+      headers: authHeaders(),
+    })
       .then(async (res) => {
         if (res.ok) {
           const data = (await res.json()) as GenerationResult

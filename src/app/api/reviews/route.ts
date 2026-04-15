@@ -30,6 +30,17 @@ export async function POST(request: NextRequest) {
         { status: 401 },
       )
     }
+    if (user.role !== "expert" && user.role !== "admin") {
+      return NextResponse.json(
+        {
+          error: {
+            message: "Only experts and admins can create reviews",
+            code: "FORBIDDEN",
+          },
+        },
+        { status: 403 },
+      )
+    }
     const body = (await request.json()) as { projectId?: string; deliverableId?: string }
     const { projectId, deliverableId } = body
     if (!projectId || !deliverableId) {

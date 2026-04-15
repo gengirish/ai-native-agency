@@ -13,11 +13,7 @@ export async function GET(request: NextRequest) {
         { status: 401 },
       )
     }
-    const { tiers, compliance } = await (
-      getSla as (
-        tenantId?: string,
-      ) => Promise<Awaited<ReturnType<typeof getSla>>>
-    )(user.tenantId)
+    const { tiers, compliance } = await getSla(user.tenantId)
     return NextResponse.json({
       tiers,
       compliance,

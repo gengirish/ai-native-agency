@@ -286,7 +286,7 @@ async function seed() {
       id: REV_LUMEN,
       project_id: P_LUMEN,
       deliverable_id: D_LUMEN,
-      expert_id: U_SARAH,
+      expert_id: U_MAYA,
       status: 'revision_requested',
       rating: 4,
       timeSpent: 18,

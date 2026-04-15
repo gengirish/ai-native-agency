@@ -13,6 +13,7 @@ import type {
   AIModel,
   AutonomyConfig,
   Benchmark,
+  BrandAsset,
   BrandProfile,
   ChannelConfig,
   CostBreakdown,
@@ -93,7 +94,7 @@ export async function findUserByEmail(email: string): Promise<DbUser | null> {
       name: String(r.name),
       email: String(r.email),
       role: String(r.role) as UserRole,
-      tenantId: String(r.tenant_id),
+      tenantId: r.tenant_id ? String(r.tenant_id) : "",
       specialty: r.specialty ? String(r.specialty) : undefined,
       passwordHash: r.password_hash ? String(r.password_hash) : undefined,
       createdAt: String(r.created_at),
@@ -128,7 +129,7 @@ export async function findUserById(id: string): Promise<DbUser | null> {
       name: String(r.name),
       email: String(r.email),
       role: String(r.role) as UserRole,
-      tenantId: String(r.tenant_id),
+      tenantId: r.tenant_id ? String(r.tenant_id) : "",
       specialty: r.specialty ? String(r.specialty) : undefined,
       passwordHash: r.password_hash ? String(r.password_hash) : undefined,
       createdAt: String(r.created_at),
@@ -172,7 +173,7 @@ export async function createUser(input: CreateUserInput): Promise<DbUser> {
       name: String(r.name),
       email: String(r.email),
       role: String(r.role) as UserRole,
-      tenantId: String(r.tenant_id),
+      tenantId: r.tenant_id ? String(r.tenant_id) : "",
       specialty: r.specialty ? String(r.specialty) : undefined,
       createdAt: String(r.created_at),
     }
@@ -225,7 +226,7 @@ export async function getProjects(tenantId?: string): Promise<Project[]> {
         `
     return rows.map((r) => mapProjectRow(r))
   }
-  return store.projects
+  return tenantId ? store.projects.filter((p) => p.clientId === tenantId) : store.projects
 }
 
 export async function getProjectById(id: string, tenantId?: string): Promise<Project | null> {
@@ -519,6 +520,17 @@ export async function updateDeliverable(
   return d
 }
 
+function mapDeliverableStatus(dbStatus: string): Deliverable["status"] {
+  const map: Record<string, Deliverable["status"]> = {
+    draft: "generating",
+    in_review: "qa_check",
+    approved: "approved",
+    rejected: "revision",
+    delivered: "approved",
+  }
+  return map[dbStatus] ?? "qa_check"
+}
+
 function mapDeliverableRow(r: Record<string, unknown>): Deliverable {
   const meta = (r.metadata ?? {}) as Record<string, unknown>
   return {
@@ -529,7 +541,7 @@ function mapDeliverableRow(r: Record<string, unknown>): Deliverable {
     type: String(r.file_type ?? r.type ?? ""),
     fileUrl: String(r.file_url ?? ""),
     thumbnailUrl: String(r.thumbnail_url ?? ""),
-    status: String(r.status ?? "generating") as Deliverable["status"],
+    status: mapDeliverableStatus(String(r.status ?? "in_review")),
     aiModel: String(meta.ai_model ?? ""),
     generationCost: Number(meta.generation_cost ?? 0),
     generationTime: Number(meta.generation_time ?? 0),
@@ -852,23 +864,71 @@ export async function getBrandProfiles(tenantId?: string): Promise<BrandProfile[
   return store.brandProfiles
 }
 
+function guidelinesFromRow(r: Record<string, unknown>): Record<string, unknown> {
+  const raw = r.guidelines_text
+  if (raw == null) return {}
+  if (typeof raw === "string") {
+    try {
+      const parsed = JSON.parse(raw) as unknown
+      return typeof parsed === "object" && parsed !== null && !Array.isArray(parsed)
+        ? (parsed as Record<string, unknown>)
+        : {}
+    } catch {
+      return {}
+    }
+  }
+  if (typeof raw === "object" && !Array.isArray(raw)) return raw as Record<string, unknown>
+  return {}
+}
+
+function assetsFromGuidelines(guidelines: Record<string, unknown>): BrandAsset[] {
+  const raw = guidelines.assets
+  if (!Array.isArray(raw)) return []
+  return raw.map((a, i) => {
+    if (typeof a === "string") {
+      return { id: `asset-${i}`, type: "photo", url: a, name: "", tags: [] }
+    }
+    if (a && typeof a === "object") {
+      const o = a as Record<string, unknown>
+      const typeStr = String(o.type ?? "photo")
+      const type = (["logo", "icon", "pattern", "photo", "template"].includes(typeStr)
+        ? typeStr
+        : "photo") as BrandAsset["type"]
+      return {
+        id: String(o.id ?? `asset-${i}`),
+        type,
+        url: String(o.url ?? ""),
+        name: String(o.name ?? ""),
+        tags: Array.isArray(o.tags) ? (o.tags as string[]) : [],
+      }
+    }
+    return { id: `asset-${i}`, type: "photo", url: "", name: "", tags: [] }
+  })
+}
+
 function mapBrandRow(r: Record<string, unknown>): BrandProfile {
+  const guidelines = guidelinesFromRow(r)
   return {
     id: String(r.id),
-    tenantId: String(r.tenant_id),
+    tenantId: r.tenant_id ? String(r.tenant_id) : "",
     name: String(r.name),
-    websiteUrl: "",
-    logoUrl: Array.isArray(r.logo_urls) && (r.logo_urls as string[]).length ? String((r.logo_urls as string[])[0]) : "",
+    websiteUrl: String(guidelines.websiteUrl ?? guidelines.website_url ?? ""),
+    logoUrl:
+      Array.isArray(r.logo_urls) && (r.logo_urls as string[]).length
+        ? String((r.logo_urls as string[])[0])
+        : String(guidelines.logoUrl ?? guidelines.logo_url ?? ""),
     colors: Array.isArray(r.colors) ? (r.colors as BrandProfile["colors"]) : [],
     fonts: Array.isArray(r.fonts) ? (r.fonts as BrandProfile["fonts"]) : [],
-    toneOfVoice: String(r.tone_of_voice ?? ""),
-    values: [],
-    targetAudience: String(r.target_audience ?? ""),
-    industry: String(r.industry ?? ""),
-    competitors: [],
-    assets: [],
-    dnaScore: 0,
-    projectsCompleted: 0,
+    toneOfVoice: String(
+      r.tone_of_voice ?? guidelines.toneOfVoice ?? guidelines.tone_of_voice ?? "",
+    ),
+    values: Array.isArray(guidelines.values) ? (guidelines.values as string[]) : [],
+    targetAudience: String(r.target_audience ?? guidelines.targetAudience ?? ""),
+    industry: String(r.industry ?? guidelines.industry ?? ""),
+    competitors: Array.isArray(guidelines.competitors) ? (guidelines.competitors as string[]) : [],
+    assets: assetsFromGuidelines(guidelines),
+    dnaScore: Number(guidelines.dnaScore ?? guidelines.dna_score ?? 0),
+    projectsCompleted: Number(guidelines.projectsCompleted ?? guidelines.projects_completed ?? 0),
     lastUpdated: new Date(r.updated_at as string).toISOString(),
   }
 }
@@ -891,7 +951,7 @@ export async function getDashboardStats(tenantId?: string) {
     const [projRows, revRows, costRows] = tenantId
       ? await Promise.all([
           sql`SELECT count(*) as total, count(*) FILTER (WHERE status NOT IN ('delivered','cancelled')) as active FROM projects WHERE tenant_id = ${tenantId}::uuid`,
-          sql`SELECT count(DISTINCT tenant_id) as clients FROM projects WHERE tenant_id = ${tenantId}::uuid`,
+          sql`SELECT count(DISTINCT created_by) as clients FROM projects WHERE tenant_id = ${tenantId}::uuid`,
           sql`SELECT COALESCE(sum(ai_cost_cents),0) as total_ai_cost, COALESCE(sum(price_cents),0) as total_revenue FROM projects WHERE tenant_id = ${tenantId}::uuid`,
         ])
       : await Promise.all([
@@ -1536,10 +1596,12 @@ export async function getPublishing(tenantId?: string): Promise<{
   }
 }
 
-export async function getBenchmarks(): Promise<Benchmark[]> {
+export async function getBenchmarks(tenantId?: string): Promise<Benchmark[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`SELECT * FROM benchmarks ORDER BY category, metric`
+    const rows = tenantId
+      ? await sql`SELECT * FROM benchmarks WHERE tenant_id = ${tenantId}::uuid ORDER BY category, metric`
+      : await sql`SELECT * FROM benchmarks ORDER BY category, metric`
     return rows.map((r) => ({
       id: String(r.id),
       category: String(r.category),
@@ -1555,13 +1617,24 @@ export async function getBenchmarks(): Promise<Benchmark[]> {
   return store.benchmarks
 }
 
-export async function getSla(): Promise<{ tiers: SLATier[]; compliance: SLACompliance[] }> {
+export async function getSla(tenantId?: string): Promise<{ tiers: SLATier[]; compliance: SLACompliance[] }> {
   if (hasDb()) {
     const sql = getDb()!
-    const [tierRows, compRows] = await Promise.all([
-      sql`SELECT * FROM sla_tiers ORDER BY first_draft_hours DESC`,
-      sql`SELECT sc.*, p.title as project_title FROM sla_compliance sc LEFT JOIN projects p ON p.id = sc.project_id ORDER BY sc.created_at DESC`,
-    ])
+    const tierRows = await sql`SELECT * FROM sla_tiers ORDER BY first_draft_hours DESC`
+    const compRows = tenantId
+      ? await sql`
+          SELECT sc.*, p.title as project_title
+          FROM sla_compliance sc
+          LEFT JOIN projects p ON p.id = sc.project_id
+          WHERE sc.tenant_id = ${tenantId}::uuid
+          ORDER BY sc.created_at DESC
+        `
+      : await sql`
+          SELECT sc.*, p.title as project_title
+          FROM sla_compliance sc
+          LEFT JOIN projects p ON p.id = sc.project_id
+          ORDER BY sc.created_at DESC
+        `
     return {
       tiers: tierRows.map((r) => ({
         tier: String(r.tier) as SLATier["tier"],
@@ -1589,10 +1662,12 @@ export async function getSla(): Promise<{ tiers: SLATier[]; compliance: SLACompl
   return { tiers: store.slaTiers, compliance: store.slaCompliance }
 }
 
-export async function getRevenueMetrics(): Promise<RevenueMetric[]> {
+export async function getRevenueMetrics(tenantId?: string): Promise<RevenueMetric[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`SELECT * FROM revenue_metrics ORDER BY month ASC`
+    const rows = tenantId
+      ? await sql`SELECT * FROM revenue_metrics WHERE tenant_id = ${tenantId}::uuid ORDER BY month ASC`
+      : await sql`SELECT * FROM revenue_metrics ORDER BY month ASC`
     return rows.map((r) => ({
       month: String(r.month),
       revenue: Number(r.revenue_cents ?? 0) / 100,
@@ -1606,10 +1681,12 @@ export async function getRevenueMetrics(): Promise<RevenueMetric[]> {
   return store.revenueMetrics
 }
 
-export async function getCostBreakdown(): Promise<CostBreakdown[]> {
+export async function getCostBreakdown(tenantId?: string): Promise<CostBreakdown[]> {
   if (hasDb()) {
     const sql = getDb()!
-    const rows = await sql`SELECT * FROM cost_breakdown ORDER BY amount_cents DESC`
+    const rows = tenantId
+      ? await sql`SELECT * FROM cost_breakdown WHERE tenant_id = ${tenantId}::uuid ORDER BY amount_cents DESC`
+      : await sql`SELECT * FROM cost_breakdown ORDER BY amount_cents DESC`
     return rows.map((r) => ({
       category: String(r.category),
       amount: Number(r.amount_cents ?? 0) / 100,

@@ -13,9 +13,7 @@ export async function GET(request: NextRequest) {
         { status: 401 },
       )
     }
-    const data = await (
-      getAIModels as (tenantId?: string) => Promise<Awaited<ReturnType<typeof getAIModels>>>
-    )(user.tenantId)
+    const data = await getAIModels()
     return NextResponse.json({ data })
   } catch (err) {
     console.error(`[API] ${request.method} ${request.url}:`, err)

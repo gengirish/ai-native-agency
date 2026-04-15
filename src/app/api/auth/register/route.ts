@@ -64,43 +64,51 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const role: UserRole = "client"
+  try {
+    const role: UserRole = "client"
 
-  const existing = await findUserByEmail(normalizedEmail)
-  if (existing) {
-    return NextResponse.json({ error: "Email already registered" }, { status: 409 })
-  }
+    const existing = await findUserByEmail(normalizedEmail)
+    if (existing) {
+      return NextResponse.json({ error: "Email already registered" }, { status: 409 })
+    }
 
-  const passwordHash = bcrypt.hashSync(password, 10)
-  const tenantId = await resolveDefaultTenantId()
+    const passwordHash = bcrypt.hashSync(password, 10)
+    const tenantId = await resolveDefaultTenantId()
 
-  const row = await createUser({
-    name: name.trim(),
-    email: normalizedEmail,
-    role,
-    tenantId,
-    passwordHash,
-  })
+    const row = await createUser({
+      name: name.trim(),
+      email: normalizedEmail,
+      role,
+      tenantId,
+      passwordHash,
+    })
 
-  const token = await signToken({
-    sub: row.id,
-    email: row.email,
-    role: row.role,
-    tenantId: row.tenantId,
-  })
+    const token = await signToken({
+      sub: row.id,
+      email: row.email,
+      role: row.role,
+      tenantId: row.tenantId,
+    })
 
-  return NextResponse.json(
-    {
-      user: {
-        id: row.id,
-        name: row.name,
-        email: row.email,
-        role: row.role,
-        tenantId: row.tenantId,
-        createdAt: row.createdAt,
+    return NextResponse.json(
+      {
+        user: {
+          id: row.id,
+          name: row.name,
+          email: row.email,
+          role: row.role,
+          tenantId: row.tenantId,
+          createdAt: row.createdAt,
+        },
+        token,
       },
-      token,
-    },
-    { status: 201 },
-  )
+      { status: 201 },
+    )
+  } catch (err) {
+    console.error("[API] POST /api/auth/register:", err)
+    return NextResponse.json(
+      { error: { message: "Registration failed", code: "INTERNAL_ERROR" } },
+      { status: 500 },
+    )
+  }
 }

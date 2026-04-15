@@ -13,11 +13,7 @@ export async function GET(request: NextRequest) {
         { status: 401 },
       )
     }
-    const data = await (
-      getBenchmarks as (
-        tenantId?: string,
-      ) => Promise<Awaited<ReturnType<typeof getBenchmarks>>>
-    )(user.tenantId)
+    const data = await getBenchmarks(user.tenantId)
     return NextResponse.json({ data })
   } catch (err) {
     console.error(`[API] ${request.method} ${request.url}:`, err)

@@ -13,11 +13,7 @@ export async function GET(request: NextRequest) {
         { status: 401 },
       )
     }
-    const data = await (
-      getRevenueMetrics as (
-        tenantId?: string,
-      ) => Promise<Awaited<ReturnType<typeof getRevenueMetrics>>>
-    )(user.tenantId)
+    const data = await getRevenueMetrics(user.tenantId)
     return NextResponse.json({ data })
   } catch (err) {
     console.error(`[API] ${request.method} ${request.url}:`, err)

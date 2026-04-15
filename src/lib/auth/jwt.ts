@@ -3,6 +3,13 @@ import { findUserById } from "@/lib/dal"
 import type { User } from "@/types"
 
 const JWT_SECRET = process.env.JWT_SECRET || "agencyos-dev-secret-not-for-production"
+
+if (!process.env.JWT_SECRET && process.env.NODE_ENV === "production") {
+  console.error(
+    "WARNING: JWT_SECRET is not set. Using insecure default. Set JWT_SECRET environment variable in production!",
+  )
+}
+
 const HEADER = { alg: "HS256", typ: "JWT" } as const
 
 export type JwtPayload = {

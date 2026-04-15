@@ -111,6 +111,7 @@ export default function NewBriefPage() {
     if (genResult) {
       try {
         sessionStorage.setItem("agencyos:gen-result", JSON.stringify(genResult))
+        sessionStorage.setItem("agencyos:brief-created", "1")
       } catch { /* private mode */ }
       router.push(`/projects/${project.id}/generated`)
     } else {

@@ -26,7 +26,7 @@ import type {
   UsageRecord,
 } from "@/types"
 
-function authHeaders(): HeadersInit {
+export function authHeaders(): HeadersInit {
   if (typeof window === "undefined") return {}
   const token = localStorage.getItem("agencyos_token")
   return token ? { Authorization: `Bearer ${token}` } : {}

@@ -9,7 +9,7 @@ import { PublishingQueue } from "@/components/publishing/publishing-queue"
 import { QuickPublishPanel } from "@/components/publishing/quick-publish-panel"
 import { RequireRole } from "@/components/auth/require-role"
 import { EmptyState } from "@/components/ui/empty-state"
-import { getChannelConfigs, getPublishingJobs } from "@/lib/api"
+import { authHeaders, getChannelConfigs, getPublishingJobs } from "@/lib/api"
 import type { ChannelConfig, PublishingJob } from "@/types"
 
 export default function PublishingPage() {
@@ -25,7 +25,7 @@ export default function PublishingPage() {
       try {
         const res = await fetch(`/api/publishing/${encodeURIComponent(id)}`, {
           method: "PATCH",
-          headers: { "Content-Type": "application/json" },
+          headers: { "Content-Type": "application/json", ...authHeaders() },
           body: JSON.stringify(body),
         })
         const json = (await res.json().catch(() => null)) as
