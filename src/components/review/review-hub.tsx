@@ -13,6 +13,8 @@ import type { Deliverable, Project, Review, ReviewComment, UserRole } from "@/ty
 import { cn } from "@/lib/utils"
 import { RequireRole } from "@/components/auth/require-role"
 import { EmptyState } from "@/components/ui/empty-state"
+import { ReviewHubSkeleton } from "@/components/ui/skeleton"
+import { useToast } from "@/components/ui/toast"
 import { ReviewQueue } from "./review-queue"
 import { ReviewDetailPanel } from "./review-detail-panel"
 
@@ -27,6 +29,7 @@ const FILTER_TABS: { id: FilterTab; label: string }[] = [
 
 export function ReviewHub() {
   const { user } = useAuth()
+  const { toast } = useToast()
   const commentAuthor = user?.name ?? "You"
   const commentAuthorRole: UserRole = user?.role ?? "expert"
 
@@ -36,13 +39,6 @@ export function ReviewHub() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<FilterTab>("all")
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    if (!error) return
-    const t = setTimeout(() => setError(null), 5000)
-    return () => clearTimeout(t)
-  }, [error])
 
   useEffect(() => {
     let cancelled = false
@@ -95,48 +91,54 @@ export function ReviewHub() {
     return deliverables.filter((d) => d.projectId === selectedReview.projectId)
   }, [selectedReview, deliverables])
 
-  const updateReview = useCallback((id: string, patch: Partial<Review>) => {
-    let previous: Review | null = null
-    setReviews((prev) => {
-      const current = prev.find((r) => r.id === id)
-      if (current) {
-        previous = { ...current, comments: current.comments.map((c) => ({ ...c })) }
-      }
-      return prev.map((r) => (r.id === id ? { ...r, ...patch } : r))
-    })
+  const updateReview = useCallback(
+    (id: string, patch: Partial<Review>) => {
+      let previous: Review | null = null
+      setReviews((prev) => {
+        const current = prev.find((r) => r.id === id)
+        if (current) {
+          previous = { ...current, comments: current.comments.map((c) => ({ ...c })) }
+        }
+        return prev.map((r) => (r.id === id ? { ...r, ...patch } : r))
+      })
 
-    const apiPatch: { status?: string; rating?: number } = {}
-    if (patch.status !== undefined) apiPatch.status = patch.status
-    if (patch.rating !== undefined) apiPatch.rating = patch.rating
-    if (Object.keys(apiPatch).length === 0) return
+      const apiPatch: { status?: string; rating?: number } = {}
+      if (patch.status !== undefined) apiPatch.status = patch.status
+      if (patch.rating !== undefined) apiPatch.rating = patch.rating
+      if (Object.keys(apiPatch).length === 0) return
 
-    void (async () => {
-      const updated = await apiUpdateReview(id, apiPatch)
-      if (updated === null && previous) {
-        setReviews((prev) => prev.map((r) => (r.id === id ? previous! : r)))
-        setError("Could not update the review. Please try again.")
-      }
-    })()
-  }, [])
+      void (async () => {
+        const updated = await apiUpdateReview(id, apiPatch)
+        if (updated === null && previous) {
+          setReviews((prev) => prev.map((r) => (r.id === id ? previous! : r)))
+          toast("error", "Could not update the review. Please try again.")
+        }
+      })()
+    },
+    [toast],
+  )
 
-  const appendComment = useCallback((reviewId: string, comment: ReviewComment) => {
-    setReviews((prev) =>
-      prev.map((r) => (r.id === reviewId ? { ...r, comments: [...r.comments, comment] } : r)),
-    )
-    void (async () => {
-      const res = await addReviewComment(reviewId, { content: comment.content })
-      if (res === null) {
-        setReviews((prev) =>
-          prev.map((r) =>
-            r.id === reviewId
-              ? { ...r, comments: r.comments.filter((c) => c.id !== comment.id) }
-              : r,
-          ),
-        )
-        setError("Could not add your comment. Please try again.")
-      }
-    })()
-  }, [])
+  const appendComment = useCallback(
+    (reviewId: string, comment: ReviewComment) => {
+      setReviews((prev) =>
+        prev.map((r) => (r.id === reviewId ? { ...r, comments: [...r.comments, comment] } : r)),
+      )
+      void (async () => {
+        const res = await addReviewComment(reviewId, { content: comment.content })
+        if (res === null) {
+          setReviews((prev) =>
+            prev.map((r) =>
+              r.id === reviewId
+                ? { ...r, comments: r.comments.filter((c) => c.id !== comment.id) }
+                : r,
+            ),
+          )
+          toast("error", "Could not add your comment. Please try again.")
+        }
+      })()
+    },
+    [toast],
+  )
 
   const deliverable = selectedReview ? deliverablesById.get(selectedReview.deliverableId) : undefined
   const project = selectedReview ? projectsById.get(selectedReview.projectId) : undefined
@@ -149,19 +151,8 @@ export function ReviewHub() {
           <p className="mt-1 text-slate-600">Review, comment, and approve deliverables</p>
         </header>
 
-        {error ? (
-          <div
-            className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 shadow-sm"
-            role="alert"
-          >
-            {error}
-          </div>
-        ) : null}
-
         {loading ? (
-          <div className="flex items-center justify-center py-24">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
-          </div>
+          <ReviewHubSkeleton />
         ) : reviews.length === 0 ? (
           <EmptyState
             title="No reviews pending"

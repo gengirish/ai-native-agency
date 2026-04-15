@@ -79,7 +79,11 @@ const navigation: NavSection[] = [
   },
 ]
 
-export function Sidebar() {
+type SidebarProps = {
+  onClose?: () => void
+}
+
+export function Sidebar({ onClose }: SidebarProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { user, logout } = useAuth()
@@ -138,6 +142,7 @@ export function Sidebar() {
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      onClick={() => onClose?.()}
                       aria-current={isActive ? "page" : undefined}
                       className={cn(
                         "flex items-center gap-3 rounded-lg px-3 py-2 text-[13px] font-medium transition-all duration-150",

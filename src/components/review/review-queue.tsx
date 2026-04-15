@@ -44,8 +44,10 @@ export function ReviewQueue({
             type="button"
             onClick={() => onSelect(review.id)}
             className={cn(
-              "w-full rounded-xl border bg-white p-4 text-left shadow-sm transition hover:border-slate-200 hover:shadow",
-              selected ? "border-2 border-indigo-500 ring-1 ring-indigo-500/20" : "border border-slate-100",
+              "w-full rounded-xl border-2 bg-white p-4 text-left shadow-sm transition-all duration-200 cursor-pointer",
+              selected
+                ? "border-indigo-500 ring-1 ring-indigo-500/20 shadow-md"
+                : "border-transparent ring-1 ring-slate-200 hover:ring-slate-300 hover:shadow",
             )}
           >
             <div className="flex flex-wrap items-start justify-between gap-2">

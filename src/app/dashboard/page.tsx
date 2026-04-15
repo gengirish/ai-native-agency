@@ -10,6 +10,7 @@ import { DashboardKpiCards } from "@/components/dashboard/dashboard-kpi-cards"
 import { DashboardProjectsTable } from "@/components/dashboard/dashboard-projects-table"
 import { DashboardRevenueChart } from "@/components/dashboard/dashboard-revenue-chart"
 import { EmptyState } from "@/components/ui/empty-state"
+import { DashboardSkeleton } from "@/components/ui/skeleton"
 import { useAuth } from "@/lib/auth/context"
 import {
   type DashboardStats,
@@ -86,9 +87,7 @@ export default function DashboardPage() {
   return (
     <RequireRole permission="dashboard:view">
       {loading ? (
-        <div className="flex items-center justify-center py-24">
-          <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
-        </div>
+        <DashboardSkeleton />
       ) : (
         <div className="space-y-6 p-8">
           <header>

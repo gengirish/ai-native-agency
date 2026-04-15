@@ -85,19 +85,21 @@ test.describe("RBAC - Role Gating", () => {
   test("client sees restricted sidebar", async ({ page }) => {
     await loginAs(page, "client")
     await page.goto("/dashboard")
-    await expect(page.locator("a[href='/dashboard']")).toBeVisible()
-    await expect(page.locator("a[href='/projects']")).toBeVisible()
-    await expect(page.locator("a[href='/crm']")).not.toBeVisible()
-    await expect(page.locator("a[href='/analytics']")).not.toBeVisible()
+    const sidebar = page.locator("aside").first()
+    await expect(sidebar.locator("a[href='/dashboard']")).toBeVisible()
+    await expect(sidebar.locator("a[href='/projects']")).toBeVisible()
+    await expect(sidebar.locator("a[href='/crm']")).not.toBeVisible()
+    await expect(sidebar.locator("a[href='/analytics']")).not.toBeVisible()
   })
 
   test("expert sees only expert-relevant sections", async ({ page }) => {
     await loginAs(page, "expert")
     await page.goto("/dashboard")
-    await expect(page.locator("a[href='/expert']")).toBeVisible()
-    await expect(page.locator("a[href='/review']")).toBeVisible()
-    await expect(page.locator("a[href='/crm']")).not.toBeVisible()
-    await expect(page.locator("a[href='/billing']")).not.toBeVisible()
+    const sidebar = page.locator("aside").first()
+    await expect(sidebar.locator("a[href='/expert']")).toBeVisible()
+    await expect(sidebar.locator("a[href='/review']")).toBeVisible()
+    await expect(sidebar.locator("a[href='/crm']")).not.toBeVisible()
+    await expect(sidebar.locator("a[href='/billing']")).not.toBeVisible()
   })
 
   test("admin page shows access restricted for client", async ({ page }) => {

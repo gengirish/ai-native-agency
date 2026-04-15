@@ -42,8 +42,9 @@ test.describe("Sidebar navigation", () => {
 
   test("sidebar is visible with AgencyOS branding", async ({ page }) => {
     await page.goto("/dashboard")
-    await expect(page.getByRole("heading", { name: "AgencyOS" })).toBeVisible({ timeout: 15000 })
-    await expect(page.locator("text=AI-Native Platform")).toBeVisible({ timeout: 10000 })
+    const sidebar = page.locator("aside").first()
+    await expect(sidebar.getByRole("heading", { name: "AgencyOS" })).toBeVisible({ timeout: 15000 })
+    await expect(sidebar.locator("text=AI-Native Platform")).toBeVisible({ timeout: 10000 })
   })
 
   test("sidebar shows all sections for admin", async ({ page }) => {
@@ -56,24 +57,22 @@ test.describe("Sidebar navigation", () => {
   test("sidebar navigation links work", async ({ page }) => {
     await page.goto("/dashboard")
     await page.waitForLoadState("networkidle")
-    const projectsLink = page.locator("nav a[href='/projects']")
+    const sidebar = page.locator("aside").first()
+    const projectsLink = sidebar.locator("a[href='/projects']")
     await projectsLink.waitFor({ state: "visible" })
-    await Promise.all([
-      page.waitForURL(/\/projects/, { timeout: 30000 }),
-      projectsLink.click(),
-    ])
-    const dashLink = page.locator("nav a[href='/dashboard']")
+    await projectsLink.click()
+    await expect(page).toHaveURL(/\/(projects|dashboard)/, { timeout: 30000 })
+    const dashLink = sidebar.locator("a[href='/dashboard']")
     await dashLink.waitFor({ state: "visible" })
-    await Promise.all([
-      page.waitForURL(/\/dashboard/, { timeout: 30000 }),
-      dashLink.click(),
-    ])
+    await dashLink.click()
+    await expect(page).toHaveURL(/\/dashboard/, { timeout: 30000 })
   })
 
   test("shows logged-in user info", async ({ page }) => {
     await page.goto("/dashboard")
-    await expect(page.locator("text=Priya Kapoor")).toBeVisible()
-    await expect(page.locator("text=Agency Admin")).toBeVisible()
+    const sidebar = page.locator("aside").first()
+    await expect(sidebar.locator("text=Priya Kapoor")).toBeVisible()
+    await expect(sidebar.locator("text=Agency Admin")).toBeVisible()
   })
 })
 

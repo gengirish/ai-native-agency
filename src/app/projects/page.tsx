@@ -3,6 +3,8 @@
 import { RequireRole } from "@/components/auth/require-role"
 import { formatProjectTypeLabel } from "@/components/brief/project-type-config"
 import { EmptyState } from "@/components/ui/empty-state"
+import { ProjectsListSkeleton } from "@/components/ui/skeleton"
+import { useToast } from "@/components/ui/toast"
 import { getProjects } from "@/lib/api"
 import {
   cn,
@@ -55,12 +57,18 @@ function ProjectCard({ project }: { project: Project }) {
   const typeBadge = formatProjectTypeLabel(project.type)
   const quality =
     project.qualityScore > 0 ? `${project.qualityScore.toFixed(1)} / 5` : "—"
+  const hasOutput = project.deliverableCount > 0
 
-  return (
-    <article className="flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition hover:border-slate-300 hover:shadow-md">
+  const cardClasses =
+    "group flex flex-col rounded-xl border border-slate-200 bg-white p-5 shadow-sm transition-all duration-200 hover:border-slate-300 hover:shadow-md"
+
+  const content = (
+    <>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="font-semibold text-slate-900">{project.title}</h2>
+          <h2 className="font-semibold text-slate-900 transition-colors group-hover:text-slate-950">
+            {project.title}
+          </h2>
           <p className="mt-0.5 text-sm text-slate-600">{project.clientName}</p>
         </div>
         <span
@@ -114,27 +122,38 @@ function ProjectCard({ project }: { project: Project }) {
           <dd className="mt-0.5 font-medium text-slate-800">{project.revisionCount}</dd>
         </div>
       </dl>
-      {project.deliverableCount > 0 && (
-        <Link
-          href={`/projects/${project.id}/generated`}
-          className="mt-4 inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-xs font-semibold text-indigo-700 transition hover:bg-indigo-100"
-        >
-          <Sparkles className="h-3.5 w-3.5" />
+      {hasOutput && (
+        <div className="mt-4 flex items-center gap-1.5 text-xs font-semibold text-indigo-600 transition-colors group-hover:text-indigo-800">
+          <Sparkles className="h-3.5 w-3.5 shrink-0 transition-transform group-hover:scale-110" />
           View AI Output
-        </Link>
+        </div>
       )}
-    </article>
+    </>
   )
+
+  if (hasOutput) {
+    return (
+      <Link
+        href={`/projects/${project.id}/generated`}
+        className={cn(
+          cardClasses,
+          "cursor-pointer focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2",
+        )}
+      >
+        {content}
+      </Link>
+    )
+  }
+
+  return <article className={cardClasses}>{content}</article>
 }
 
-type ProjectsToast = "brief-created" | "gen-failed" | null
-
 export default function ProjectsPage() {
+  const { toast } = useToast()
   const [projects, setProjects] = useState<Project[]>([])
   const [loading, setLoading] = useState(true)
   const [tab, setTab] = useState<StatusTab>("all")
   const [query, setQuery] = useState("")
-  const [toast, setToast] = useState<ProjectsToast>(null)
 
   useEffect(() => {
     void getProjects().then((data) => {
@@ -147,17 +166,20 @@ export default function ProjectsPage() {
     try {
       if (sessionStorage.getItem(GEN_FAILED_FLAG) === "1") {
         sessionStorage.removeItem(GEN_FAILED_FLAG)
-        setToast("gen-failed")
+        toast(
+          "warning",
+          "Project created but AI generation failed. You can retry from the project."
+        )
         return
       }
       if (sessionStorage.getItem(BRIEF_CREATED_FLAG) === "1") {
         sessionStorage.removeItem(BRIEF_CREATED_FLAG)
-        setToast("brief-created")
+        toast("success", "Project created from your brief.")
       }
     } catch {
       /* private mode */
     }
-  }, [])
+  }, [toast])
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase()
@@ -182,36 +204,6 @@ export default function ProjectsPage() {
   return (
     <RequireRole permission="projects:view">
       <div className="p-8">
-        {toast === "brief-created" ? (
-          <div
-            className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-green-200 bg-green-50 px-4 py-3 text-sm text-green-900 shadow-sm"
-            role="status"
-          >
-            <span>Project created from your brief.</span>
-            <button
-              type="button"
-              onClick={() => setToast(null)}
-              className="shrink-0 rounded-md px-2 py-1 font-medium text-green-900 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-green-600 focus:ring-offset-2"
-            >
-              Dismiss
-            </button>
-          </div>
-        ) : null}
-        {toast === "gen-failed" ? (
-          <div
-            className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-950 shadow-sm"
-            role="alert"
-          >
-            <span>Project created but AI generation failed. You can retry from the project.</span>
-            <button
-              type="button"
-              onClick={() => setToast(null)}
-              className="shrink-0 rounded-md px-2 py-1 font-medium text-amber-950 underline-offset-2 hover:underline focus:outline-none focus:ring-2 focus:ring-amber-600 focus:ring-offset-2"
-            >
-              Dismiss
-            </button>
-          </div>
-        ) : null}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-indigo-100 text-indigo-700">
@@ -263,10 +255,7 @@ export default function ProjectsPage() {
         </div>
 
         {loading ? (
-          <div className="mt-10 flex flex-col items-center justify-center gap-3 rounded-xl border border-slate-200 bg-white py-20 shadow-sm">
-            <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-200 border-t-indigo-600" />
-            <p className="text-sm text-slate-600">Loading projects…</p>
-          </div>
+          <ProjectsListSkeleton />
         ) : projects.length === 0 ? (
           <div className="mt-10">
             <EmptyState
