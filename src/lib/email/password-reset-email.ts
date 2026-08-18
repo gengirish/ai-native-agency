@@ -31,7 +31,18 @@ function resolveBaseUrl(requestOrigin?: string): string {
     return requestOrigin.replace(/\/$/, "")
   }
 
-  return configured || "http://localhost:3000"
+  if (configured) return configured
+
+  // Platform-supplied and not attacker-controllable (unlike the Host header),
+  // so it is a safe last resort when NEXT_PUBLIC_APP_URL was never set. Without
+  // it a production deploy silently mails out unusable localhost links.
+  const vercelHost =
+    process.env.VERCEL_PROJECT_PRODUCTION_URL?.trim() || process.env.VERCEL_URL?.trim()
+  if (vercelHost) {
+    return `https://${vercelHost.replace(/^https?:\/\//, "").replace(/\/$/, "")}`
+  }
+
+  return "http://localhost:3000"
 }
 
 export async function sendPasswordResetEmail(

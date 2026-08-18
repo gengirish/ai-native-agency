@@ -3,6 +3,7 @@ import type { NextRequest } from "next/server"
 import { findUserByEmail } from "@/lib/dal"
 import { issueResetTokenForUser } from "@/lib/auth/password-reset"
 import { sendPasswordResetEmail } from "@/lib/email/password-reset-email"
+import { isEmailConfigured } from "@/lib/email/agentmail"
 import { getClientIp, rateLimit } from "@/lib/rate-limit"
 
 export const runtime = "nodejs"
@@ -47,6 +48,21 @@ export async function POST(request: NextRequest) {
   const normalizedEmail = email.trim().toLowerCase()
   if (!EMAIL_PATTERN.test(normalizedEmail) || normalizedEmail.length > 254) {
     return NextResponse.json({ error: "Invalid email format" }, { status: 400 })
+  }
+
+  // Whether email is configured is a property of the server, not of the address
+  // being asked about, so reporting it leaks nothing about which accounts exist.
+  // Checked before the per-email throttle so a misconfiguration doesn't also burn
+  // the caller's one-per-minute budget. Outside production the sender keeps its
+  // old behaviour of logging the link for an operator to hand over.
+  if (process.env.NODE_ENV === "production" && !isEmailConfigured()) {
+    console.error(
+      "[API] POST /api/auth/forgot-password: AGENTMAIL_API_KEY / AGENTMAIL_SYSTEM_INBOX_ID are not set — no reset email can be sent.",
+    )
+    return NextResponse.json(
+      { error: "Password reset email is temporarily unavailable. Please contact support." },
+      { status: 503 },
+    )
   }
 
   // Per-email: 1 request/minute, so nobody can flood a real user's inbox.
