@@ -14,14 +14,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const drawerRef = useRef<HTMLDivElement>(null)
 
-  const isLoginPage = pathname === "/login"
-  const isLandingPage = pathname === "/"
+  // Pages a signed-out visitor must be able to reach. This has to stay in step
+  // with PUBLIC_PATHS in src/middleware.ts: middleware lets the request through,
+  // but the shell would still bounce the visitor to /login on the client — which
+  // is exactly what made emailed reset links unusable.
+  const isPublicPage =
+    pathname === "/" ||
+    pathname === "/login" ||
+    pathname === "/forgot-password" ||
+    pathname === "/reset-password"
 
   useEffect(() => {
-    if (!isLoading && !isAuthenticated && !isLoginPage && !isLandingPage) {
+    if (!isLoading && !isAuthenticated && !isPublicPage) {
       router.replace("/login")
     }
-  }, [isLoading, isAuthenticated, isLoginPage, isLandingPage, router])
+  }, [isLoading, isAuthenticated, isPublicPage, router])
 
   useEffect(() => {
     setSidebarOpen(false)
@@ -92,7 +99,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     }
   }, [sidebarOpen])
 
-  if (isLoginPage || isLandingPage) {
+  if (isPublicPage) {
     return <>{children}</>
   }
 

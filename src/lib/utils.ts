@@ -21,17 +21,27 @@ export function formatCurrencyPrecise(amount: number): string {
   }).format(amount)
 }
 
-export function formatDate(date: string | Date): string {
+/**
+ * Optional dates are common — a project without a deadline maps to "" — and
+ * Intl throws RangeError on an invalid Date. Unguarded, that took down whole
+ * pages: one project with no due date crashed the entire projects list.
+ */
+export function formatDate(date: string | Date | null | undefined): string {
+  if (!date) return "—"
+  const parsed = new Date(date)
+  if (Number.isNaN(parsed.getTime())) return "—"
   return new Intl.DateTimeFormat("en-US", {
     month: "short",
     day: "numeric",
     year: "numeric",
-  }).format(new Date(date))
+  }).format(parsed)
 }
 
-export function formatRelativeTime(date: string | Date): string {
+export function formatRelativeTime(date: string | Date | null | undefined): string {
+  if (!date) return "—"
   const now = new Date("2026-04-05T12:00:00Z")
   const then = new Date(date)
+  if (Number.isNaN(then.getTime())) return "—"
   const diffMs = now.getTime() - then.getTime()
   const diffMins = Math.floor(diffMs / 60000)
   const diffHours = Math.floor(diffMins / 60)

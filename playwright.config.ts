@@ -1,4 +1,4 @@
-import { defineConfig } from "@playwright/test"
+import { defineConfig, devices } from "@playwright/test"
 
 export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
@@ -16,6 +16,20 @@ export default defineConfig({
     trace: "on-first-retry",
     actionTimeout: 45000,
   },
+  projects: [
+    {
+      name: "desktop",
+      use: { ...devices["Desktop Chrome"] },
+      // The drawer only exists below the lg breakpoint; running it here would
+      // assert against a layout that never renders.
+      testIgnore: /responsive\.spec\.ts/,
+    },
+    {
+      name: "mobile",
+      use: { ...devices["Pixel 5"] },
+      testMatch: /responsive\.spec\.ts/,
+    },
+  ],
   webServer: process.env.BASE_URL
     ? undefined
     : {

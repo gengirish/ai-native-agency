@@ -1,10 +1,10 @@
 import { test, expect } from "@playwright/test"
-import { loginAs } from "./helpers"
+import { gotoApp, loginAs } from "./helpers"
 
 test.describe("Dashboard", () => {
   test.beforeEach(async ({ page }) => {
     await loginAs(page, "admin")
-    await page.goto("/dashboard")
+    await gotoApp(page, "/dashboard")
   })
 
   test("displays Dashboard heading", async ({ page }) => {

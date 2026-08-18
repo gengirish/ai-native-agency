@@ -20,7 +20,7 @@ test.describe("Brand DNA", () => {
     await loginAs(page, "admin")
     await page.goto("/brand")
     const content = page.locator("text=/no brand|brand dna|extract/i").first()
-    await expect(content).toBeVisible({ timeout: 10000 })
+    await expect(content).toBeVisible()
   })
 })
 
@@ -35,7 +35,7 @@ test.describe("Expert Dashboard", () => {
     await loginAs(page, "expert")
     await page.goto("/expert")
     const content = page.locator("text=/no assignment|queue|review/i").first()
-    await expect(content).toBeVisible({ timeout: 10000 })
+    await expect(content).toBeVisible()
   })
 })
 
