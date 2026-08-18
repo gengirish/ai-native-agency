@@ -3,8 +3,12 @@ import { NextRequest, NextResponse } from "next/server"
 const PUBLIC_PATHS = [
   "/",
   "/login",
+  "/forgot-password",
+  "/reset-password",
   "/api/auth/login",
   "/api/auth/register",
+  "/api/auth/forgot-password",
+  "/api/auth/reset-password",
   "/api/auth/me",
   "/api/health",
 ]

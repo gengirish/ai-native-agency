@@ -201,6 +201,29 @@ export async function createUser(input: CreateUserInput): Promise<DbUser> {
   }
 }
 
+/**
+ * Set a new password hash for a user. Returns false when the user no longer
+ * exists (e.g. deleted between issuing and consuming a reset token).
+ */
+export async function updateUserPassword(
+  userId: string,
+  passwordHash: string,
+): Promise<boolean> {
+  if (hasDb()) {
+    const sql = getDb()!
+    const rows = await sql`
+      UPDATE users SET password_hash = ${passwordHash}, updated_at = now()
+      WHERE id = ${userId}::uuid
+      RETURNING id
+    `
+    return rows.length > 0
+  }
+  const user = store.users.find((u) => u.id === userId)
+  if (!user) return false
+  user.password = passwordHash
+  return true
+}
+
 /* ------------------------------------------------------------------ */
 /*  Projects                                                          */
 /* ------------------------------------------------------------------ */

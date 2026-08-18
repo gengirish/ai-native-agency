@@ -2,6 +2,10 @@ import type { NextConfig } from "next"
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // The agentmail SDK lazily references @x402/fetch (an optional crypto-payments
+  // extra we don't use). Keeping it external stops webpack from trying to
+  // resolve that import at build time.
+  serverExternalPackages: ["agentmail"],
   async headers() {
     return [
       {
